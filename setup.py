@@ -19,7 +19,7 @@ setup(
     license='MIT',
     author='Dmitry Krukov',
     author_email='glebov.ru@gmail.com',
-    description='Tool for create shared notes',
+    description='The tool for creating notes',
     long_description=open('README.rst').read(),
     keywords='noteit note console command line messages', 
     classifiers=[

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
+from __future__ import print_function
 
 import argparse
 import base64
@@ -10,6 +11,7 @@ import platform
 import select
 import sys
 import traceback
+from socket import gaierror
 
 try:
     from httplib import HTTPConnection, HTTPSConnection  # Py<=3
@@ -296,11 +298,18 @@ def _make_request(url, method=GET, data=None, headers=None):
 def _get_host():
     host = os.environ.get('NOTEIT_HOST')
     if not host:
-        conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
-        conn.request(GET, _CONF_LINK)
-        request = conn.getresponse()
-        conf_from_git = request.read().decode('ascii')
-        host = json.loads(conf_from_git)['host']
+        try:
+            conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
+            conn.request(GET, _CONF_LINK)
+            request = conn.getresponse()
+            conf_from_git = request.read().decode('ascii')
+            host = json.loads(conf_from_git)['host']
+        except gaierror:
+            print("Noteit require internet connection", file=sys.stderr)
+            sys.exit(1)
+        except Exception:
+            print("Something went wrong, we will fix it as soon as possible", file=sys.stderr)
+            sys.exit(1)
     return host
 
 
@@ -315,8 +324,7 @@ def _get_from_pipe():
 
 def get_options_parser():
     """Arguments deffinition"""
-    parser = argparse.ArgumentParser(description='noteit', prog='noteit',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description='noteit', prog='noteit')
     
     parser.add_argument('--version', action='version', version='%(prog)s ' + get_version(),
                         help='displays the current version of %(prog)s and exit')
@@ -394,8 +402,8 @@ def main():
         if _DEBUG:
             raise
         if not options.report:
-            print('Something went wrong! You can sent report to us with "-r" option')
-            return
+            print('Something went wrong! You can sent report to us with "-r" option', file=sys.stderr)
+            sys.exit(1)
         print(report(traceback.format_exc()))
 
 
