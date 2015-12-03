@@ -305,11 +305,9 @@ def _get_host():
             conf_from_git = request.read().decode('ascii')
             host = json.loads(conf_from_git)['host']
         except gaierror:
-            print("Noteit require internet connection", file=sys.stderr)
-            sys.exit(1)
+            sys.exit("Noteit require internet connection")
         except Exception:
-            print("Something went wrong, we will fix it as soon as possible", file=sys.stderr)
-            sys.exit(1)
+            sys.exit("Something went wrong, we will fix it as soon as possible")
     return host
 
 
@@ -324,7 +322,7 @@ def _get_from_pipe():
 
 def get_options_parser():
     """Arguments deffinition"""
-    parser = argparse.ArgumentParser(description='noteit', prog='noteit')
+    parser = argparse.ArgumentParser(description='Tool for creating notes', prog='noteit')
     
     parser.add_argument('--version', action='version', version='%(prog)s ' + get_version(),
                         help='displays the current version of %(prog)s and exit')
@@ -402,8 +400,7 @@ def main():
         if _DEBUG:
             raise
         if not options.report:
-            print('Something went wrong! You can sent report to us with "-r" option', file=sys.stderr)
-            sys.exit(1)
+            sys.exit('Something went wrong! You can sent report to us with "-r" option')
         print(report(traceback.format_exc()))
 
 
