@@ -25,6 +25,7 @@ except ImportError:
 
 _DEBUG = False
 _CACHED_ATTR = '_cache'
+_PASS_CACHE_KWARG = 'not_cached'
 __VERSION__ = '0.8.0'
 GET, POST, PUT = 'GET', 'POST', 'PUT'
 
@@ -60,11 +61,13 @@ def cached_function(func):
     """Decorator that chache function result at first call and return cached result other calls """
 
     def _func(*args, **kwargs):
-        if hasattr(func, _CACHED_ATTR) and getattr(func, _CACHED_ATTR) is not None and not _DEBUG:
-            return getattr(func, _CACHED_ATTR)
-        result = func(*args, **kwargs)
-        setattr(func, _CACHED_ATTR, result)
-        return result
+        force = kwargs.pop(_PASS_CACHE_KWARG, False)
+        if not hasattr(func, _CACHED_ATTR) or force or _is_debug():
+            result = func(*args, **kwargs)
+            if result is not None:
+                setattr(func, _CACHED_ATTR, result)
+            return result
+        return getattr(func, _CACHED_ATTR)
     return _func
 
 
@@ -76,6 +79,12 @@ def display(out, stdout=sys.stdout):
 def get_version():
     """Return version of client"""
     return __VERSION__
+
+
+def _is_debug():
+    if _DEBUG:
+        return True
+    return '--debug' in sys.argv
 
 
 def get_notes():
@@ -326,6 +335,7 @@ def get_options_parser():
     
     parser.add_argument('--version', action='version', version='%(prog)s ' + get_version(),
                         help='displays the current version of %(prog)s and exit')
+    parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
 
     parser.add_argument('note', metavar='NOTE', type=str, nargs='*', default=_get_from_pipe(),
                         help='New Note')
@@ -397,7 +407,7 @@ def main():
     except ConnectionError:
         display('Something wrong with connection, check your internet or try again later')
     except Exception:
-        if _DEBUG:
+        if _is_debug():
             raise
         if not options.report:
             sys.exit('Something went wrong! You can sent report to us with "-r" option')
