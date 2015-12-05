@@ -26,7 +26,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.8.0'
+__VERSION__ = '0.8.1'
 GET, POST, PUT = 'GET', 'POST', 'PUT'
 
 _ANONYMOUS_USER_AGENT = 'anonymous'
@@ -277,7 +277,7 @@ def _response_handler(response):
 @cached_function
 def _get_connection():
     """Create and return conection with host"""
-    host = get_options().host
+    host = _get_host()
     if host.startswith('https://'):
         host = host[8:]
         connection = HTTPSConnection
@@ -305,7 +305,9 @@ def _make_request(url, method=GET, data=None, headers=None):
 
 @cached_function
 def _get_host():
-    host = os.environ.get('NOTEIT_HOST')
+    host = get_options().host or os.environ.get('NOTEIT_HOST')
+    if _is_debug():
+        return 'localhost:8000'
     if not host:
         try:
             conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
@@ -315,8 +317,6 @@ def _get_host():
             host = json.loads(conf_from_git)['host']
         except gaierror:
             sys.exit("Noteit require internet connection")
-        except Exception:
-            sys.exit("Something went wrong, we will fix it as soon as possible")
     return host
 
 
@@ -337,13 +337,13 @@ def get_options_parser():
                         help='displays the current version of %(prog)s and exit')
     parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
 
-    parser.add_argument('note', metavar='NOTE', type=str, nargs='*', default=_get_from_pipe(),
+    parser.add_argument('note', metavar='NOTE', nargs='*', default=_get_from_pipe(),
                         help='New Note')
-    parser.add_argument('-c', '--create', type=str, nargs='*', help='Create note')
+    parser.add_argument('-c', '--create', nargs='*', help='Create note')
 
-    parser.add_argument('-u', '--user', help='username', type=str)
-    parser.add_argument('-p', '--password', help='password', type=str)
-    parser.add_argument('--host', default=_get_host(), help='host (default: %s)' % _get_host(), type=str)
+    parser.add_argument('-u', '--user', help='username')
+    parser.add_argument('-p', '--password', help='password')
+    parser.add_argument('--host', help=argparse.SUPPRESS)
 
     parser.add_argument('-a', '--all', help='display all notes',
                         action='store_true')
