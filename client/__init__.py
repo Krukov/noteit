@@ -26,7 +26,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.8.1'
+__VERSION__ = '0.8.2'
 GET, POST, PUT = 'GET', 'POST', 'PUT'
 
 _ANONYMOUS_USER_AGENT = 'anonymous'
@@ -73,18 +73,6 @@ def cached_function(func):
 
 def display(out, stdout=sys.stdout):
     stdout.write('>' + '\n>'.join(out.splitlines()) + '\n')
-
-
-@cached_function
-def get_version():
-    """Return version of client"""
-    return __VERSION__
-
-
-def _is_debug():
-    if _DEBUG:
-        return True
-    return '--debug' in sys.argv
 
 
 def get_notes():
@@ -156,11 +144,6 @@ def _get_token():
         return token
 
 
-def _get_from_stdin(text):
-    """communication with stdin"""
-    return input(text)
-
-
 def registration(question_location):
     """Asks user for answer the question at given location and send result """
     prompt = "If you are not registered yet, answer the question '{0}': ".format(do_request(question_location)[0])
@@ -171,18 +154,93 @@ def registration(question_location):
     return False
 
 
+# END API METHODS
+
+@cached_function
+def get_version():
+    """Return version of client"""
+    return __VERSION__
+
+
+def do_request(path, *args, **kwargs):
+    """Make request and handle response"""
+    kwargs.setdefault('headers', {}).update(_get_headers())
+    response = _make_request(path, *args, **kwargs)
+    response._attrs = path, args, kwargs  # for retrying
+    return _response_handler(response)
+
+
 def retry(response):
     """Retry last response"""
     return do_request(response._attrs[0], *response._attrs[1], **response._attrs[2])
 
 
+def _response_handler(response):
+    """Handle response status"""
+    if response.status in [401, ]:
+        raise AuthenticationError
+    elif response.status > 500:
+        raise ServerError
+    elif response.status in [301, 302, 303, 307]:
+        if registration(response.getheader('Location')):
+            return retry(response)
+        raise AuthenticationError
+    return response.read().decode('ascii'), response.status
+
+
 @cached_function
+def _get_connection():
+    """Create and return conection with host"""
+    host = _get_host()
+    if host.startswith('https://'):
+        host = host[8:]
+        connection = HTTPSConnection
+    else:
+        connection = HTTPConnection
+        host = host.replace('http://', '')
+    return connection(host)
+
+
+def _make_request(url, method=GET, data=None, headers=None):
+    """Generate request and send it"""
+    headers = headers or {}
+    method = method.upper()
+    conn = _get_connection()
+    if data:
+        data = urlencode(data).encode('ascii')
+        if method == GET:
+            url = '?'.join([url, data or ''])
+
+    if method in [POST]:
+        headers.update({"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"})
+    conn.request(method, url, body=data, headers=headers)
+    return conn.getresponse()
+
+
+@cached_function
+def _get_host():
+    """Return notiit backend host"""
+    host = get_options().host or os.environ.get('NOTEIT_HOST')
+    if _is_debug():
+        return 'localhost:8000'
+    if not host:
+        #  Get host from .conf file from repo
+        try:
+            conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
+            conn.request(GET, _CONF_LINK)
+            request = conn.getresponse()
+            conf_from_git = request.read().decode('ascii')
+            host = json.loads(conf_from_git)['host']
+        except gaierror:
+            sys.exit("Noteit require internet connection")
+    return host
+
+
 def _get_password():
     """Return password from argument or asks user for it"""
     return get_options().password or getpass.getpass('Input your password: ')
 
 
-@cached_function
 def _get_user():
     """Return user from argument or asks user for it"""
     return get_options().user or _get_from_stdin('Input username: ')
@@ -253,80 +311,25 @@ def _get_headers():
     return headers
 
 
-def do_request(path, *args, **kwargs):
-    """Make request and handle response"""
-    kwargs.setdefault('headers', {}).update(_get_headers())
-    response = _make_request(path, *args, **kwargs)
-    response._attrs = path, args, kwargs
-    return _response_handler(response)
-
-
-def _response_handler(response):
-    """Handle response status"""
-    if response.status in [401, ]:
-        raise AuthenticationError
-    elif response.status > 500:
-        raise ServerError
-    elif response.status in [301, 302, 303, 307]:
-        if registration(response.getheader('Location')):
-            return retry(response)
-        raise AuthenticationError
-    return response.read().decode('ascii'), response.status
-
-
-@cached_function
-def _get_connection():
-    """Create and return conection with host"""
-    host = _get_host()
-    if host.startswith('https://'):
-        host = host[8:]
-        connection = HTTPSConnection
-    else:
-        connection = HTTPConnection
-        host = host.replace('http://', '')
-    return connection(host)
-
-
-def _make_request(url, method=GET, data=None, headers=None):
-    """Generate request and send it"""
-    headers = headers or {}
-    method = method.upper()
-    conn = _get_connection()
-    if data:
-        data = urlencode(data).encode('ascii')
-        if method == GET:
-            url = '?'.join([url, data or ''])
-
-    if method in [POST]:
-        headers.update({"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"})
-    conn.request(method, url, body=data, headers=headers)
-    return conn.getresponse()
-
-
-@cached_function
-def _get_host():
-    host = get_options().host or os.environ.get('NOTEIT_HOST')
-    if _is_debug():
-        return 'localhost:8000'
-    if not host:
-        try:
-            conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
-            conn.request(GET, _CONF_LINK)
-            request = conn.getresponse()
-            conf_from_git = request.read().decode('ascii')
-            host = json.loads(conf_from_git)['host']
-        except gaierror:
-            sys.exit("Noteit require internet connection")
-    return host
+def _get_from_stdin(text):
+    """communication with stdin"""
+    return input(text)
 
 
 def _get_from_pipe():
+    """Read stdin if pipe is open | """
     try:
         is_in_pipe = select.select([sys.stdin], [], [], 0.0)[0]
     except select.error:
         return
     else:
         return sys.stdin.read() if is_in_pipe else None
+
+
+def _is_debug():
+    if _DEBUG:
+        return True
+    return '--debug' in sys.argv
 
 
 def get_options_parser():
@@ -345,7 +348,7 @@ def get_options_parser():
     parser.add_argument('-p', '--password', help='password')
     parser.add_argument('--host', help=argparse.SUPPRESS)
 
-    parser.add_argument('-a', '--all', help='display all notes',
+    parser.add_argument('--all', help='display all notes',
                         action='store_true')
     parser.add_argument('-l', '--last', help='display only last note',
                         action='store_true')
@@ -380,7 +383,7 @@ def main():
             display(drop_tokens())
             _delete_token()
 
-        if not options.do_not_save:
+        if not options.do_not_save and not _get_token_from_system():
             token = _get_token()
             if token:
                 _save_token(token)
