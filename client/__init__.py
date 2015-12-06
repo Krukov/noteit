@@ -389,11 +389,11 @@ def main():
                 pass
             _delete_token()
 
-        if options.note or options.create:
+        elif options.note or options.create:
             note = options.note or options.create
             display(create_note(' '.join(note) if isinstance(note, (list, tuple)) else note))
         
-        if options.all:
+        elif options.all:
             display(get_notes())
         elif options.num_note:
             display(get_note(options.num_note))
@@ -403,13 +403,13 @@ def main():
             display(get_notes())
 
     except KeyboardInterrupt:
-        display('\n')
+        sys.exit('\n')
     except AuthenticationError:
-        display('Error at authentication. Maybe given username is busy')
+        sys.exit('Error at authentication. Maybe given username is busy')
     except ServerError:
-        display('Sorry we have got server error. Please, try again later')
+        sys.exit('Sorry we have got server error. Please, try again later')
     except ConnectionError:
-        display('Something wrong with connection, check your internet or try again later')
+        sys.exit('Something wrong with connection, check your internet or try again later')
     except Exception:
         if _is_debug():
             raise
@@ -417,7 +417,7 @@ def main():
             sys.exit('Something went wrong! You can sent report to us with "-r" option')
         print(report(traceback.format_exc()))
 
-    if not options.do_not_save and not _get_token_from_system():
+    if not options.do_not_save and not _get_token_from_system() and not options.drop_tokens:
         token = _get_token()
         if token:
             _save_token(token)
