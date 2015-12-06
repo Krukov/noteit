@@ -26,7 +26,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.8.2'
+__VERSION__ = '0.8.10'
 GET, POST, PUT = 'GET', 'POST', 'PUT'
 
 _ANONYMOUS_USER_AGENT = 'anonymous'
@@ -72,14 +72,14 @@ def cached_function(func):
 
 
 def display(out, stdout=sys.stdout):
-    stdout.write('>' + '\n>'.join(out.splitlines()) + '\n')
+    stdout.write(out + '\n')
 
 
 def get_notes():
     """Return user's notes as string"""
     notes, status = do_request(_URLS_MAP['get_notes'])
     if status == 200:
-        return notes
+        return '>' + '\n>'.join(notes.splitlines())
     elif status == 204:
         return "You haven't notes"
     raise Exception('Error at get_notes method: {} {}'.format(status, notes))
