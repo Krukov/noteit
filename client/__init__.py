@@ -19,7 +19,7 @@ try:
     from socket import error as ConnectionError
     input = raw_input
 except ImportError:
-    from http.client import HTTPConnection, HTTPSConnection # Py>=3
+    from http.client import HTTPConnection, HTTPSConnection  # Py>=3
     from urllib.parse import urlencode
 
 
@@ -177,15 +177,17 @@ def retry(response):
 
 def _response_handler(response):
     """Handle response status"""
+    response_body = response.read().decode('ascii')
+    response.close()
     if response.status in [401, ]:
         raise AuthenticationError
     elif response.status > 500:
         raise ServerError
-    elif response.status in [301, 302, 303, 307]:
+    elif response.status in [301, 302, 303, 307] and response._method != POST:
         if registration(response.getheader('Location')):
             return retry(response)
         raise AuthenticationError
-    return response.read().decode('ascii'), response.status
+    return response_body, response.status
 
 
 @cached_function
@@ -214,6 +216,7 @@ def _make_request(url, method=GET, data=None, headers=None):
     if method in [POST]:
         headers.update({"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"})
     conn.request(method, url, body=data, headers=headers)
+
     return conn.getresponse()
 
 
@@ -221,9 +224,9 @@ def _make_request(url, method=GET, data=None, headers=None):
 def _get_host():
     """Return notiit backend host"""
     host = get_options().host or os.environ.get('NOTEIT_HOST')
-    if _is_debug():
-        return 'localhost:8000'
     if not host:
+        if _is_debug():
+            return 'localhost:8000'
         #  Get host from .conf file from repo
         try:
             conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
@@ -246,11 +249,13 @@ def _get_user():
     return get_options().user or _get_from_stdin('Input username: ')
 
 
+@cached_function
 def _get_credentials():
     """Return username and password"""
     return _get_user(), _get_password()
 
 
+@cached_function
 def _get_user_agent():
     """Return User-Agent for request header"""
     if get_options().anon:
@@ -258,7 +263,6 @@ def _get_user_agent():
     return _generate_user_agent_with_info()
 
 
-@cached_function
 def _generate_user_agent_with_info():
     """Generete User-Agent with enveroupment info"""
     return '; '.join([
@@ -269,9 +273,8 @@ def _generate_user_agent_with_info():
     ])
 
 
-@cached_function
 def _get_token_from_system():
-    """Return tocken from file"""
+    """Return token from file"""
     if _TOKEN_ENV_VALUE in os.environ:
         return os.environ.get(_TOKEN_ENV_VALUE)
     if os.path.isfile(_TOKEN_PATH):
@@ -280,7 +283,7 @@ def _get_token_from_system():
 
 
 def _save_token(token):
-    """Save tocken to file"""
+    """Save token to file"""
     if not os.path.exists(os.path.dirname(_TOKEN_PATH)):
         os.makedirs(os.path.dirname(_TOKEN_PATH))
     with open(_TOKEN_PATH, 'w') as token_file:
@@ -294,6 +297,7 @@ def _delete_token():
         os.remove(_TOKEN_PATH)
 
 
+@cached_function
 def _get_encoding_basic_credentials():
     """Return value of header for Basic Authentication"""
     return b'basic ' + base64.b64encode(':'.join(_get_credentials()).encode('ascii'))
@@ -333,7 +337,7 @@ def _is_debug():
 
 
 def get_options_parser():
-    """Arguments deffinition"""
+    """Arguments definition"""
     parser = argparse.ArgumentParser(description='Tool for creating notes', prog='noteit')
     
     parser.add_argument('--version', action='version', version='%(prog)s ' + get_version(),
@@ -378,15 +382,12 @@ def main():
     """Main"""
     options = get_options()
     try:
-        
-        if options.drop_tokens:
-            display(drop_tokens())
+        if options.drop_tokens and _get_token_from_system():
+            try:
+                display(drop_tokens())
+            except (AuthenticationError, ServerError, ConnectionError):
+                pass
             _delete_token()
-
-        if not options.do_not_save and not _get_token_from_system():
-            token = _get_token()
-            if token:
-                _save_token(token)
 
         if options.note or options.create:
             note = options.note or options.create
@@ -415,6 +416,11 @@ def main():
         if not options.report:
             sys.exit('Something went wrong! You can sent report to us with "-r" option')
         print(report(traceback.format_exc()))
+
+    if not options.do_not_save and not _get_token_from_system():
+        token = _get_token()
+        if token:
+            _save_token(token)
 
 
 if __name__ == '__main__':
