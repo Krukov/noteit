@@ -26,7 +26,11 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
+<<<<<<< Updated upstream
 __VERSION__ = '0.8.2'
+=======
+__VERSION__ = '0.8.'
+>>>>>>> Stashed changes
 GET, POST, PUT = 'GET', 'POST', 'PUT'
 
 _ANONYMOUS_USER_AGENT = 'anonymous'
@@ -246,11 +250,13 @@ def _get_user():
     return get_options().user or _get_from_stdin('Input username: ')
 
 
+@cached_function
 def _get_credentials():
     """Return username and password"""
     return _get_user(), _get_password()
 
 
+@cached_function
 def _get_user_agent():
     """Return User-Agent for request header"""
     if get_options().anon:
@@ -258,7 +264,6 @@ def _get_user_agent():
     return _generate_user_agent_with_info()
 
 
-@cached_function
 def _generate_user_agent_with_info():
     """Generete User-Agent with enveroupment info"""
     return '; '.join([
@@ -269,7 +274,6 @@ def _generate_user_agent_with_info():
     ])
 
 
-@cached_function
 def _get_token_from_system():
     """Return tocken from file"""
     if _TOKEN_ENV_VALUE in os.environ:
@@ -294,6 +298,7 @@ def _delete_token():
         os.remove(_TOKEN_PATH)
 
 
+@cached_function
 def _get_encoding_basic_credentials():
     """Return value of header for Basic Authentication"""
     return b'basic ' + base64.b64encode(':'.join(_get_credentials()).encode('ascii'))
@@ -379,8 +384,11 @@ def main():
     options = get_options()
     try:
         
-        if options.drop_tokens:
-            display(drop_tokens())
+        if options.drop_tokens and _get_token_from_system():
+            try:
+                display(drop_tokens())
+            except:
+                pass
             _delete_token()
 
         if not options.do_not_save and not _get_token_from_system():
