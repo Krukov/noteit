@@ -95,14 +95,27 @@ def get_note(number):
     raise Exception('Error at get_note method: {} {}'.format(status, note))
 
 
+def get_note_by_alias(alias):
+    """Return user note of given number (number in [1..5])"""
+    note, status = do_request(_URLS_MAP['get_notes'], data={'alias': alias})
+    if status == 200:
+        return note
+    elif status == 404:
+        return "No note with given alias"
+    raise Exception('Error at get_note_by_alias method: {} {}'.format(status, note))
+
+
 def get_last_note():
     """Return last saved note"""
     return get_note(1)
 
 
-def create_note(note):
+def create_note(note, alias=None):
     """Make request for saving note"""
-    _, status = do_request(_URLS_MAP['get_notes'], method=POST, data={'note': note})
+    data = {'note': note}
+    if alias:
+        data['alias'] = alias
+    _, status = do_request(_URLS_MAP['get_notes'], method=POST, data=data)
     if status == 201:
         return 'Note saved'
     raise Exception('Error at create_note method: {} {}'.format(status, _))
@@ -211,7 +224,7 @@ def _make_request(url, method=GET, data=None, headers=None):
     if data:
         data = urlencode(data).encode('ascii')
         if method == GET:
-            url = '?'.join([url, data or ''])
+            url = '?'.join([url, data.decode('ascii') or ''])
 
     if method in [POST]:
         headers.update({"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"})
@@ -357,6 +370,8 @@ def get_options_parser():
     parser.add_argument('-l', '--last', help='display only last note',
                         action='store_true')
     parser.add_argument('-n', '--num-note', help='display only note with given number', type=int)
+    parser.add_argument('-a', '--alias', help='set alias for note / display note with given alias')
+
     parser.add_argument('-d', '--drop-tokens', help='make all you tokens invalid',
                         action='store_true')
 
@@ -391,8 +406,12 @@ def main():
 
         elif options.note or options.create:
             note = options.note or options.create
-            display(create_note(' '.join(note) if isinstance(note, (list, tuple)) else note))
+            note = ' '.join(note) if isinstance(note, (list, tuple)) else note
+            alias = options.alias
+            display(create_note(note, alias))
         
+        elif options.alias:
+            display(get_note_by_alias(alias=options.alias))
         elif options.all:
             display(get_notes())
         elif options.num_note:
