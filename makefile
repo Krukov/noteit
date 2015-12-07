@@ -9,7 +9,7 @@ mini: clean
 
 tag:
 	git tag $(shell python client/__init__.py --version| grep "\d+.\d+.\d+" -Po)
-	git push --tags
+	git push origin stable --tags
 
 pypi_pull:
 	python setup.py register
@@ -18,8 +18,11 @@ pypi_pull:
 commit:
 	git commit -am "Release auto commit. ver. $(shell python client/__init__.py --version| grep "\d+.\d+.\d+" -Po)"
 
+gch_stable:
+	git checkout stable
+
 clean:
 	find . -name *.pyc -delete
 	rm -rf $(shell find . -name __pycache__) build *.egg-info dist
 
-release: mini commit tag pypi_pull
+release: gch_stable mini commit tag pypi_pull

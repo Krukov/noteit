@@ -1,20 +1,20 @@
 ======================================
-noteit - making and getting notes ewerywhere  beta
+noteit - create and get notes anywhere 
 ======================================
-
+.. image:: https://img.shields.io/badge/version-beta-yellow.svg
 .. image:: https://travis-ci.org/Krukov/noteit-backend.svg?branch=master
     :target: https://travis-ci.org/Krukov/noteit-backend
 .. image:: https://img.shields.io/coveralls/Krukov/noteit-backend.svg
     :target: https://coveralls.io/r/Krukov/noteit-backend
 
 --------------------------------
-The tool for simple store some notes
+The tool for simple store notes
 --------------------------------
 
-That tool I created for my own purposes, but I will glad if you will use it too.
+I created this tool for my own purposes, but I will be glad if you'll use it too.
 
 I love commandline tools like `howdoi <https://github.com/gleitz/howdoi>`_ or `fuckit <https://github.com/ajalt/fuckitpy>`_, they are really awesome.
-Sometimes we want to note something simple, some usefull: command like *tar zxvf* or password from some service(it is bad idea), and that it will be great, if you can make this note simple and fast, and than get this note anywhere. So, take this tool and enjoy!
+Sometimes it is nesessary to note something simple and usefull: commands like *tar zxvf* or any password (it is bad idea). That will be great, if you could make a note simple and fast, and then get it anywhere. I hope, you will enjoy my tool!
 
 
 How to
@@ -24,7 +24,7 @@ Install
 -----------------
 
 
-Thare are 3 ways to use this tool:
+There are 3 ways to install this tool:
 
 * simple/true/pythonic way:
 
@@ -81,6 +81,5 @@ Using
 ==========
  - json base api
  - drop note
- - aliases for notes
  - save files
  - browse notes as html
