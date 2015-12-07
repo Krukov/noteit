@@ -1,7 +1,7 @@
 ======================================
-noteit - create and get notes anywhere  beta
+noteit - create and get notes anywhere 
 ======================================
-
+.. image:: https://img.shields.io/badge/version-beta-yellow.svg
 .. image:: https://travis-ci.org/Krukov/noteit-backend.svg?branch=master
     :target: https://travis-ci.org/Krukov/noteit-backend
 .. image:: https://img.shields.io/coveralls/Krukov/noteit-backend.svg
