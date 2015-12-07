@@ -1,5 +1,5 @@
 ======================================
-noteit - making and getting notes ewerywhere  beta
+noteit - create and get notes anywhere  beta
 ======================================
 
 .. image:: https://travis-ci.org/Krukov/noteit-backend.svg?branch=master
