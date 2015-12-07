@@ -81,7 +81,7 @@ def get_notes():
     if status == 200:
         return '>' + '\n>'.join(notes.splitlines())
     elif status == 204:
-        return "You haven't notes"
+        return "You do not have notes"
     raise Exception('Error at get_notes method: {} {}'.format(status, notes))
 
 
@@ -91,7 +91,7 @@ def get_note(number):
     if status == 200:
         return note
     elif status == 404:
-        return "No note with given number"
+        return "No note with requested number"
     raise Exception('Error at get_note method: {} {}'.format(status, note))
 
 
@@ -101,7 +101,7 @@ def get_note_by_alias(alias):
     if status == 200:
         return note
     elif status == 404:
-        return "No note with given alias"
+        return "No note with requested alias"
     raise Exception('Error at get_note_by_alias method: {} {}'.format(status, note))
 
 
@@ -117,7 +117,7 @@ def create_note(note, alias=None):
         data['alias'] = alias
     _, status = do_request(_URLS_MAP['get_notes'], method=POST, data=data)
     if status == 201:
-        return 'Note saved'
+        return 'Saved'
     raise Exception('Error at create_note method: {} {}'.format(status, _))
 
 
@@ -138,15 +138,15 @@ def report(tb):
         status = conn.getresponse().status
 
     if status in range(200, 204):
-        return 'Thanks you for reporting...'
-    return 'Error: can not report error'
+        return 'Thank you for reporting...'
+    return 'Error: can not be reported'
 
 
 def drop_tokens():
     """Make request to recreate user's tokens"""
     _, status = do_request(_URLS_MAP['drop_tokens'], method=POST)
     if status == 202:
-        return 'Tokens are dropped'
+        return 'Tokens are deleted'
     raise Exception('Error at drop_token method: {} {}'.format(status, _))
 
 
@@ -159,7 +159,7 @@ def _get_token():
 
 def registration(question_location):
     """Asks user for answer the question at given location and send result """
-    prompt = "If you are not registered yet, answer the question '{0}': ".format(do_request(question_location)[0])
+    prompt = "If you are not registered yet, please answer the question '{0}': ".format(do_request(question_location)[0])
     answer = _get_from_stdin(prompt)
     response, status = do_request(question_location, POST, {'answer': answer})
     if status == 202:
@@ -248,7 +248,7 @@ def _get_host():
             conf_from_git = request.read().decode('ascii')
             host = json.loads(conf_from_git)['host']
         except gaierror:
-            sys.exit("Noteit require internet connection")
+            sys.exit("Noteit requires internet connection")
     return host
 
 
@@ -358,8 +358,8 @@ def get_options_parser():
     parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
 
     parser.add_argument('note', metavar='NOTE', nargs='*', default=_get_from_pipe(),
-                        help='New Note')
-    parser.add_argument('-c', '--create', nargs='*', help='Create note')
+                        help='new note')
+    parser.add_argument('-c', '--create', nargs='*', help='create a note')
 
     parser.add_argument('-u', '--user', help='username')
     parser.add_argument('-p', '--password', help='password')
@@ -367,17 +367,17 @@ def get_options_parser():
 
     parser.add_argument('--all', help='display all notes',
                         action='store_true')
-    parser.add_argument('-l', '--last', help='display only last note',
+    parser.add_argument('-l', '--last', help='display last note',
                         action='store_true')
-    parser.add_argument('-n', '--num-note', help='display only note with given number', type=int)
+    parser.add_argument('-n', '--num-note', help='display note with given number', type=int)
     parser.add_argument('-a', '--alias', help='set alias for note / display note with given alias')
 
     parser.add_argument('-d', '--drop-tokens', help='make all you tokens invalid',
                         action='store_true')
 
-    parser.add_argument('--do-not-save', help='disable to save token locally',
+    parser.add_argument('--do-not-save', help='disable savings token locally',
                         action='store_true')
-    parser.add_argument('-i', '--ignore', help='if set, client will skip local token',
+    parser.add_argument('-i', '--ignore', help='if set, tool will ignore local token',
                         action='store_true')
 
     parser.add_argument('--anon', help='do not add OS and other info to agent header',
@@ -424,11 +424,11 @@ def main():
     except KeyboardInterrupt:
         sys.exit('\n')
     except AuthenticationError:
-        sys.exit('Error at authentication. Maybe given username is busy')
+        sys.exit('Error in authentication. Username maybe occupied')
     except ServerError:
-        sys.exit('Sorry we have got server error. Please, try again later')
+        sys.exit('Sorry there is server error. Please, try again later')
     except ConnectionError:
-        sys.exit('Something wrong with connection, check your internet or try again later')
+        sys.exit('Something wrong with connection, check your internet connection or try again later')
     except Exception:
         if _is_debug():
             raise
