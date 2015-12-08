@@ -279,7 +279,7 @@ def _get_user_agent():
 def _generate_user_agent_with_info():
     """Generete User-Agent with environment info"""
     return ' '.join([
-        '{i.system}-{i.node}/{i.release}-{i.processor}'.format(i=platform.uname()),
+        '{i[0]}-{i[1]}/{i[2]}-{i[5]}'.format(i=platform.uname()),
         '{0}/{1}'.format(platform.python_implementation(), platform.python_version()),
         '{0}/{1}'.format('Noteit', get_version()),
     ])
