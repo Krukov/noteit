@@ -26,7 +26,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.9.0'
+__VERSION__ = '0.9.1'
 GET, POST, PUT = 'GET', 'POST', 'PUT'
 
 _ANONYMOUS_USER_AGENT = 'anonymous'
@@ -277,12 +277,11 @@ def _get_user_agent():
 
 
 def _generate_user_agent_with_info():
-    """Generete User-Agent with enveroupment info"""
-    return '; '.join([
-        platform.platform(),
-        platform.python_implementation(),
-        platform.python_version(),
-        'VERSION: {}'.format(get_version()),
+    """Generete User-Agent with environment info"""
+    return ' '.join([
+        '{i[0]}-{i[1]}/{i[2]}-{i[5]}'.format(i=platform.uname()),
+        '{0}/{1}'.format(platform.python_implementation(), platform.python_version()),
+        '{0}/{1}'.format('Noteit', get_version()),
     ])
 
 
