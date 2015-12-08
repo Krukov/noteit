@@ -26,7 +26,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.9.1'
+__VERSION__ = '0.9.2'
 GET, POST, PUT = 'GET', 'POST', 'PUT'
 
 _ANONYMOUS_USER_AGENT = 'anonymous'
