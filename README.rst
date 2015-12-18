@@ -13,7 +13,7 @@ The tool for simple store notes
 
 I created this tool for my own purposes, but I will be glad if you'll use it too.
 
-I love commandline tools like `howdoi <https://github.com/gleitz/howdoi>`_ or `fuckit <https://github.com/ajalt/fuckitpy>`_, they are really awesome.
+I love commandline tools like `howdoi <https://github.com/gleitz/howdoi>`_ , they are really awesome.
 Sometimes it is nesessary to note something simple and usefull: commands like *tar zxvf* or any password (it is bad idea). That will be great, if you could make a note simple and fast, and then get it anywhere. I hope, you will enjoy my tool!
 
 
@@ -61,11 +61,10 @@ Using
 	$ /# noteit 
 	>Input username: krukov
 	>Input your password: 
-	>If you are not registered yet, answer the question 'Do you like this tool?': yes
 	>You haven't notes
 	$ /# noteit My first note
 	>Note saved
-	$ /# echo "Noteit can get note from pipe" | noteit 
+	$ /# echo "Noteit can get note from pipe" | noteit
 	>Note saved
 	$ /# noteit 
 	>1: Noteit can get note from pipe
@@ -74,7 +73,12 @@ Using
 	>Note saved
 	$ /# noteit -l | sh
 	You can run it
-
+	$ /# noteit Create note with alias -a alias
+	>Note saved
+	$ /# noteit -a alias
+	Create note with alias
+	
+	
 
 
 *FUTURE*

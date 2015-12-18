@@ -26,7 +26,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.9.2'
+__VERSION__ = '0.9.3'
 GET, POST, PUT = 'GET', 'POST', 'PUT'
 
 _ANONYMOUS_USER_AGENT = 'anonymous'
@@ -53,12 +53,12 @@ class AuthenticationError(Exception):
 
 
 class ServerError(Exception):
-    """Error if server is retunr 50x status"""
+    """Error if server is return 50x status"""
     pass
 
 
 def cached_function(func):
-    """Decorator that chache function result at first call and return cached result other calls """
+    """Decorator that cache function result at first call and return cached result other calls """
 
     def _func(*args, **kwargs):
         force = kwargs.pop(_PASS_CACHE_KWARG, False)
@@ -122,7 +122,7 @@ def create_note(note, alias=None):
 
 
 def report(tb):
-    """Make traceback and etc. to server""" 
+    """Make traceback and etc. to server"""
     data = {'traceback': tb}
     try:
         _, status = do_request(_URLS_MAP['report'], method=POST, data=data)
@@ -205,7 +205,7 @@ def _response_handler(response):
 
 @cached_function
 def _get_connection():
-    """Create and return conection with host"""
+    """Create and return connection with host"""
     host = _get_host()
     if host.startswith('https://'):
         host = host[8:]
@@ -225,6 +225,7 @@ def _make_request(url, method=GET, data=None, headers=None):
         data = urlencode(data).encode('ascii')
         if method == GET:
             url = '?'.join([url, data.decode('ascii') or ''])
+            data = None
 
     if method in [POST]:
         headers.update({"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"})
@@ -235,11 +236,9 @@ def _make_request(url, method=GET, data=None, headers=None):
 
 @cached_function
 def _get_host():
-    """Return notiit backend host"""
+    """Return noteit backend host"""
     host = get_options().host or os.environ.get('NOTEIT_HOST')
     if not host:
-        if _is_debug():
-            return 'localhost:8000'
         #  Get host from .conf file from repo
         try:
             conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
@@ -247,8 +246,12 @@ def _get_host():
             request = conn.getresponse()
             conf_from_git = request.read().decode('ascii')
             host = json.loads(conf_from_git)['host']
+            if host.endswith('/'):
+                host = host[:-1]
         except gaierror:
             sys.exit("Noteit requires internet connection")
+    if not os.environ.get('NOTEIT_HOST'):
+        os.environ['NOTEIT_HOST'] = host
     return host
 
 
@@ -336,7 +339,7 @@ def _get_from_pipe():
     """Read stdin if pipe is open | """
     try:
         is_in_pipe = select.select([sys.stdin], [], [], 0.0)[0]
-    except select.error:
+    except (select.error, TypeError):
         return
     else:
         return sys.stdin.read() if is_in_pipe else None
@@ -351,7 +354,7 @@ def _is_debug():
 def get_options_parser():
     """Arguments definition"""
     parser = argparse.ArgumentParser(description='Tool for creating notes', prog='noteit')
-    
+
     parser.add_argument('--version', action='version', version='%(prog)s ' + get_version(),
                         help='displays the current version of %(prog)s and exit')
     parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
@@ -408,7 +411,7 @@ def main():
             note = ' '.join(note) if isinstance(note, (list, tuple)) else note
             alias = options.alias
             display(create_note(note, alias))
-        
+
         elif options.alias:
             display(get_note_by_alias(alias=options.alias))
         elif options.all:
