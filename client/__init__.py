@@ -225,6 +225,7 @@ def _make_request(url, method=GET, data=None, headers=None):
         data = urlencode(data).encode('ascii')
         if method == GET:
             url = '?'.join([url, data.decode('ascii') or ''])
+            data = None
 
     if method in [POST]:
         headers.update({"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"})
