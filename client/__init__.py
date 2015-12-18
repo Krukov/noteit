@@ -122,7 +122,7 @@ def create_note(note, alias=None):
 
 
 def report(tb):
-    """Make traceback and etc. to server""" 
+    """Make traceback and etc. to server"""
     data = {'traceback': tb}
     try:
         _, status = do_request(_URLS_MAP['report'], method=POST, data=data)
@@ -238,8 +238,6 @@ def _get_host():
     """Return notiit backend host"""
     host = get_options().host or os.environ.get('NOTEIT_HOST')
     if not host:
-        if _is_debug():
-            return 'localhost:8000'
         #  Get host from .conf file from repo
         try:
             conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
@@ -247,8 +245,12 @@ def _get_host():
             request = conn.getresponse()
             conf_from_git = request.read().decode('ascii')
             host = json.loads(conf_from_git)['host']
+            if host.endswith('/'):
+                host = host[:-1]
         except gaierror:
             sys.exit("Noteit requires internet connection")
+    if not os.environ.get('NOTEIT_HOST'):
+        os.environ['NOTEIT_HOST'] = host
     return host
 
 
@@ -351,7 +353,7 @@ def _is_debug():
 def get_options_parser():
     """Arguments definition"""
     parser = argparse.ArgumentParser(description='Tool for creating notes', prog='noteit')
-    
+
     parser.add_argument('--version', action='version', version='%(prog)s ' + get_version(),
                         help='displays the current version of %(prog)s and exit')
     parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
@@ -408,7 +410,7 @@ def main():
             note = ' '.join(note) if isinstance(note, (list, tuple)) else note
             alias = options.alias
             display(create_note(note, alias))
-        
+
         elif options.alias:
             display(get_note_by_alias(alias=options.alias))
         elif options.all:
