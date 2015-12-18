@@ -53,12 +53,12 @@ class AuthenticationError(Exception):
 
 
 class ServerError(Exception):
-    """Error if server is retunr 50x status"""
+    """Error if server is return 50x status"""
     pass
 
 
 def cached_function(func):
-    """Decorator that chache function result at first call and return cached result other calls """
+    """Decorator that cache function result at first call and return cached result other calls """
 
     def _func(*args, **kwargs):
         force = kwargs.pop(_PASS_CACHE_KWARG, False)
@@ -205,7 +205,7 @@ def _response_handler(response):
 
 @cached_function
 def _get_connection():
-    """Create and return conection with host"""
+    """Create and return connection with host"""
     host = _get_host()
     if host.startswith('https://'):
         host = host[8:]
@@ -236,7 +236,7 @@ def _make_request(url, method=GET, data=None, headers=None):
 
 @cached_function
 def _get_host():
-    """Return notiit backend host"""
+    """Return noteit backend host"""
     host = get_options().host or os.environ.get('NOTEIT_HOST')
     if not host:
         #  Get host from .conf file from repo
@@ -339,7 +339,7 @@ def _get_from_pipe():
     """Read stdin if pipe is open | """
     try:
         is_in_pipe = select.select([sys.stdin], [], [], 0.0)[0]
-    except select.error:
+    except (select.error, TypeError):
         return
     else:
         return sys.stdin.read() if is_in_pipe else None
