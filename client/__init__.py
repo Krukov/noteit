@@ -14,7 +14,7 @@ import traceback
 from socket import gaierror
 
 try:
-    from httplib import HTTPConnection, HTTPSConnection  # Py<=3
+    from httplib import HTTPConnection, HTTPSConnection  # Py<3
     from urllib import urlencode
     from socket import error as ConnectionError
     input = raw_input
@@ -26,8 +26,9 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.9.3'
-GET, POST, PUT = 'GET', 'POST', 'PUT'
+__VERSION__ = '0.10.0'
+
+GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 
 _ANONYMOUS_USER_AGENT = 'anonymous'
 _HOST_ENV_VALUE = 'NOTEIT_HOST'
@@ -35,6 +36,7 @@ _TOKEN_PATH = os.path.expanduser('~/.noteit/noteit.tkn')
 _TOKEN_ENV_VALUE = 'NOTEIT_TOKEN'
 _CONF_LINK = 'https://raw.githubusercontent.com/Krukov/noteit/stable/.conf.json'
 _USER_AGENT_HEADER = 'User-Agent'
+_CONTENT_TYPE_HEADER = 'Content-type'
 _AUTH_HEADER = 'Authorization'
 _TOKEN_HEADER = 'Authorization'
 _URLS_MAP = {
@@ -45,6 +47,8 @@ _URLS_MAP = {
     'get_note': '/{i}',
     'report': '/report',
 }
+_SUCCESS = range(200, 206)
+_TEMPLATE = '{n.alias}: {n.text}'
 
 
 class AuthenticationError(Exception):
@@ -79,46 +83,51 @@ def get_notes():
     """Return user's notes as string"""
     notes, status = do_request(_URLS_MAP['get_notes'])
     if status == 200:
-        return '>' + '\n>'.join(notes.splitlines())
+        return '>' + '\n>'.join(_TEMPLATE.format(n=type('Note', (), n)) for n in json.loads(notes))
     elif status == 204:
         return "You do not have notes"
     raise Exception('Error at get_notes method: {} {}'.format(status, notes))
 
 
-def get_note(number):
-    """Return user note of given number (number in [1..5])"""
-    note, status = do_request(_URLS_MAP['get_note'].format(i=number))
-    if status == 200:
-        return note
+def get_note(number_or_alias):
+    """Return user note of given number (number in [1..5]) or alias"""
+    note, status = do_request(_URLS_MAP['get_note'].format(i=number_or_alias))
+    if status in _SUCCESS:
+        return json.loads(note)['text']
     elif status == 404:
-        return "No note with requested number"
+        return "No note with requested alias"
     raise Exception('Error at get_note method: {} {}'.format(status, note))
 
 
-def get_note_by_alias(alias):
-    """Return user note of given number (number in [1..5])"""
-    note, status = do_request(_URLS_MAP['get_notes'], data={'alias': alias})
-    if status == 200:
-        return note
+def delete_note(number_or_alias):
+    """Delete/remove user note of given number (number in [1..5]) or alias"""
+    url = _URLS_MAP['get_note'].format(i=number_or_alias)
+    _, status = do_request(url, method=DELETE)
+    if status in _SUCCESS:
+        return "Note deleted"
     elif status == 404:
         return "No note with requested alias"
-    raise Exception('Error at get_note_by_alias method: {} {}'.format(status, note))
+    raise Exception('Error at delete_note method: {} {}'.format(status, number_or_alias))
 
 
 def get_last_note():
     """Return last saved note"""
-    return get_note(1)
+    notes, status = do_request(_URLS_MAP['get_notes'])
+    if status in _SUCCESS:
+        return json.loads(notes)[0]['text']
 
 
 def create_note(note, alias=None):
     """Make request for saving note"""
-    data = {'note': note}
+    data = {'text': note}
     if alias:
         data['alias'] = alias
-    _, status = do_request(_URLS_MAP['get_notes'], method=POST, data=data)
-    if status == 201:
+    responce, status = do_request(_URLS_MAP['get_notes'], method=POST, data=data)
+    if status in _SUCCESS:
         return 'Saved'
-    raise Exception('Error at create_note method: {} {}'.format(status, _))
+    elif status in [406, 409]:
+        return json.loads(responce)['error']
+    raise Exception('Error at create_note method: {} {}'.format(status, responce))
 
 
 def report(tb):
@@ -137,15 +146,16 @@ def report(tb):
         conn.request(POST, _URLS_MAP['report'], body=data, headers=headers)
         status = conn.getresponse().status
 
-    if status in range(200, 204):
-        return 'Thank you for reporting...'
-    return 'Error: can not be reported'
+    if status in _SUCCESS:
+        display('Thank you for reporting...')
+    else:
+        display('Error: can not be reported')
 
 
 def drop_tokens():
     """Make request to recreate user's tokens"""
     _, status = do_request(_URLS_MAP['drop_tokens'], method=POST)
-    if status == 202:
+    if status in _SUCCESS:
         return 'Tokens are deleted'
     raise Exception('Error at drop_token method: {} {}'.format(status, _))
 
@@ -153,8 +163,13 @@ def drop_tokens():
 def _get_token():
     """Send request to get token and return it at success"""
     token, status = do_request(_URLS_MAP['get_token'], method=POST)
-    if status == 201:
-        return token
+    if status in _SUCCESS:
+        return json.loads(token)['token']
+    else:
+        if get_options().report:
+            report('Error at token getting %s (%s)' % (token, status))
+        else:
+            sys.stderr.write('Can not get token, to report problem run with --report option\n')
 
 
 def registration(question_location):
@@ -162,7 +177,7 @@ def registration(question_location):
     prompt = "If you are not registered yet, please answer the question '{0}': ".format(do_request(question_location)[0])
     answer = _get_from_stdin(prompt)
     response, status = do_request(question_location, POST, {'answer': answer})
-    if status == 202:
+    if status in _SUCCESS:
         return True
     return False
 
@@ -282,9 +297,9 @@ def _get_user_agent():
 def _generate_user_agent_with_info():
     """Generete User-Agent with environment info"""
     return ' '.join([
+        '{0}/{1}'.format('Noteit', get_version()),
         '{i[0]}-{i[1]}/{i[2]}-{i[5]}'.format(i=platform.uname()),
         '{0}/{1}'.format(platform.python_implementation(), platform.python_version()),
-        '{0}/{1}'.format('Noteit', get_version()),
     ])
 
 
@@ -322,6 +337,7 @@ def _get_headers():
     """Return dict of headers for request"""
     headers = {
         _USER_AGENT_HEADER: _get_user_agent(),
+        _CONTENT_TYPE_HEADER: 'application/json'
     }
     if not get_options().user and not get_options().ignore and _get_token_from_system():
         headers[_TOKEN_HEADER] = b'token ' + _get_token_from_system().encode('ascii')
@@ -361,20 +377,17 @@ def get_options_parser():
 
     parser.add_argument('note', metavar='NOTE', nargs='*', default=_get_from_pipe(),
                         help='new note')
-    parser.add_argument('-c', '--create', nargs='*', help='create a note')
 
     parser.add_argument('-u', '--user', help='username')
     parser.add_argument('-p', '--password', help='password')
     parser.add_argument('--host', help=argparse.SUPPRESS)
 
-    parser.add_argument('--all', help='display all notes',
-                        action='store_true')
-    parser.add_argument('-l', '--last', help='display last note',
-                        action='store_true')
-    parser.add_argument('-n', '--num-note', help='display note with given number', type=int)
+    parser.add_argument('-l', '--last', help='display last note', action='store_true')
     parser.add_argument('-a', '--alias', help='set alias for note / display note with given alias')
+    parser.add_argument('-d', '--delete', help='delete note', action='store_true')
+    parser.add_argument('-o', '--overwrite', help='overwrite note', action='store_true')
 
-    parser.add_argument('-d', '--drop-tokens', help='make all you tokens invalid',
+    parser.add_argument('--drop-tokens', help='make all you tokens invalid',
                         action='store_true')
 
     parser.add_argument('--do-not-save', help='disable savings token locally',
@@ -384,7 +397,7 @@ def get_options_parser():
 
     parser.add_argument('--anon', help='do not add OS and other info to agent header',
                         action='store_true')
-    parser.add_argument('-r', '--report', help='report error', action='store_true')
+    parser.add_argument('-r', '--report', help=argparse.SUPPRESS, action='store_true')
 
     return parser
 
@@ -406,21 +419,24 @@ def main():
                 pass
             _delete_token()
 
-        elif options.note or options.create:
-            note = options.note or options.create
-            note = ' '.join(note) if isinstance(note, (list, tuple)) else note
+        elif options.note:
+            note = ' '.join(options.note) if isinstance(options.note, (list, tuple)) else options.note
             alias = options.alias
+            if options.overwrite:
+                try:
+                    delete_note(alias)
+                except:
+                    pass
             display(create_note(note, alias))
 
         elif options.alias:
-            display(get_note_by_alias(alias=options.alias))
-        elif options.all:
-            display(get_notes())
-        elif options.num_note:
-            display(get_note(options.num_note))
+            if options.delete:
+                display(delete_note(options.alias))
+            else:
+                display(get_note(options.alias))
         elif options.last:
             display(get_last_note())
-        elif not (options.note or options.create):
+        elif not options.note:
             display(get_notes())
 
     except KeyboardInterrupt:
@@ -436,7 +452,7 @@ def main():
             raise
         if not options.report:
             sys.exit('Something went wrong! You can sent report to us with "-r" option')
-        print(report(traceback.format_exc()))
+        report(traceback.format_exc())
 
     if not options.do_not_save and not _get_token_from_system() and not options.drop_tokens:
         token = _get_token()
