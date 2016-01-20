@@ -26,7 +26,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.9.3'
+__VERSION__ = '0.10.0'
 
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 
