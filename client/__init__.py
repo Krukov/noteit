@@ -147,8 +147,9 @@ def report(tb):
         status = conn.getresponse().status
 
     if status in _SUCCESS:
-        return 'Thank you for reporting...'
-    return 'Error: can not be reported'
+        display('Thank you for reporting...')
+    else:
+        display('Error: can not be reported')
 
 
 def drop_tokens():
@@ -164,6 +165,11 @@ def _get_token():
     token, status = do_request(_URLS_MAP['get_token'], method=POST)
     if status in _SUCCESS:
         return json.loads(token)['token']
+    else:
+        if get_options().report:
+            report('Error at token getting %s (%s)' % (token, status))
+        else:
+            sys.stderr.write('Can not get token, to report problem run with --report option\n')
 
 
 def registration(question_location):
@@ -171,7 +177,7 @@ def registration(question_location):
     prompt = "If you are not registered yet, please answer the question '{0}': ".format(do_request(question_location)[0])
     answer = _get_from_stdin(prompt)
     response, status = do_request(question_location, POST, {'answer': answer})
-    if status == 202:
+    if status in _SUCCESS:
         return True
     return False
 
@@ -446,7 +452,7 @@ def main():
             raise
         if not options.report:
             sys.exit('Something went wrong! You can sent report to us with "-r" option')
-        print(report(traceback.format_exc()))
+        report(traceback.format_exc())
 
     if not options.do_not_save and not _get_token_from_system() and not options.drop_tokens:
         token = _get_token()
