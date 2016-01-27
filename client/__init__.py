@@ -40,11 +40,11 @@ _CONTENT_TYPE_HEADER = 'Content-type'
 _AUTH_HEADER = 'Authorization'
 _TOKEN_HEADER = 'Authorization'
 _URLS_MAP = {
-    'create_note': '/',
+    'create_note': '/notes',
     'drop_tokens': '/drop_tokens',
     'get_token': '/get_token',
-    'get_notes': '/',
-    'get_note': '/{i}',
+    'get_notes': '/notes',
+    'get_note': '/notes/{i}',
     'report': '/report',
 }
 _SUCCESS = range(200, 206)
