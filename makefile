@@ -4,8 +4,8 @@ DIR?=noteit
 mini: clean
 	rm -rf $(DIR)
 	mkdir $(DIR)
-	pyminifier --gzip client/__init__.py > $(DIR)/noteit
-	cp $(DIR)/noteit $(DIR)/__init__.py
+	pyminifier --gzip client/__init__.py > $(DIR)/__init__.py
+	ln -s $(DIR)/__init__.py $(DIR)/noteit
 
 tag:
 	git tag $(shell python client/__init__.py --version| grep "\d+.\d+.\d+" -Po)
