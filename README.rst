@@ -24,7 +24,7 @@ Install
 -----------------
 
 
-There are 3 ways to install this tool:
+There are 2 ways to install this tool:
 
 * simple/true/pythonic way:
 
@@ -39,19 +39,11 @@ There are 3 ways to install this tool:
 	$ wget https://raw.githubusercontent.com/Krukov/noteit/stable/noteit/noteit -O /usr/bin/noteit --no-check-certificate
 	$ chmod +x /usr/bin/noteit
 
-
-
-* curl way (for those who do not want install)
+or just
 
 ::
 
-	$ python -c "$(curl -s https://raw.githubusercontent.com/Krukov/noteit/stable/noteit/noteit)" [ARGUMENTS]
-
-
-* hardcore curl way (for those who do not use python :fire:)
-
-Soon
-
+	$ curl --silent --show-error --retry 5 {noteit_host}/install.sh | sudo sh
 
 Using
 ------------
@@ -83,7 +75,5 @@ Using
 
 *FUTURE*
 ==========
- - json base api
- - drop note
  - save files
- - browse notes as html
+ - encript notes
