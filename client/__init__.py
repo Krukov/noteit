@@ -15,18 +15,18 @@ from socket import gaierror
 
 try:
     from httplib import HTTPConnection, HTTPSConnection  # Py<3
-    from urllib import urlencode
+    from urllib import urlencode, quote
     from socket import error as ConnectionError
     input = raw_input
 except ImportError:
     from http.client import HTTPConnection, HTTPSConnection  # Py>=3
-    from urllib.parse import urlencode
+    from urllib.parse import urlencode, quote
 
 
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.10.0'
+__VERSION__ = '0.11.0'
 
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 
@@ -40,11 +40,11 @@ _CONTENT_TYPE_HEADER = 'Content-type'
 _AUTH_HEADER = 'Authorization'
 _TOKEN_HEADER = 'Authorization'
 _URLS_MAP = {
-    'create_note': '/',
+    'create_note': '/notes',
     'drop_tokens': '/drop_tokens',
     'get_token': '/get_token',
-    'get_notes': '/',
-    'get_note': '/{i}',
+    'get_notes': '/notes',
+    'get_note': '/notes/{i}',
     'report': '/report',
 }
 _SUCCESS = range(200, 206)
@@ -367,6 +367,10 @@ def _is_debug():
     return '--debug' in sys.argv
 
 
+def _format_alias(alias):
+    return quote(alias, safe='')
+
+
 def get_options_parser():
     """Arguments definition"""
     parser = argparse.ArgumentParser(description='Tool for creating notes', prog='noteit')
@@ -424,16 +428,16 @@ def main():
             alias = options.alias
             if options.overwrite:
                 try:
-                    delete_note(alias)
+                    delete_note(_format_alias(alias))
                 except:
                     pass
             display(create_note(note, alias))
 
         elif options.alias:
             if options.delete:
-                display(delete_note(options.alias))
+                display(delete_note(_format_alias(options.alias)))
             else:
-                display(get_note(options.alias))
+                display(get_note(_format_alias(options.alias)))
         elif options.last:
             display(get_last_note())
         elif not options.note:
