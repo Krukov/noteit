@@ -327,8 +327,10 @@ def _md5(message):
     return md5.hexdigest()
 
 def _save_key():
-    password = _md5(_md5(_get_password()))
+    if os.path.isfile(_KEY_PATH):
+        return
 
+    password = _md5(_md5(_get_password()))
     if not os.path.exists(_PATH):
         os.makedirs(_PATH)
     with open(_KEY_PATH, 'w') as key_file:
@@ -361,6 +363,8 @@ def _get_token_from_system():
     """Return token from file"""
     if _TOKEN_ENV_VALUE in os.environ:
         return os.environ.get(_TOKEN_ENV_VALUE)
+    if get_options().token:
+        return get_options().token
     if os.path.isfile(_TOKEN_PATH):
         with open(_TOKEN_PATH) as _file:
             return _file.read().strip()
@@ -483,6 +487,7 @@ def get_options_parser():
 
     parser.add_argument('--drop-tokens', help='make all you tokens invalid',
                         action='store_true')
+    parser.add_argument('--token', help='for manual setting token')
 
     parser.add_argument('--do-not-save', help='disable savings token locally',
                         action='store_true')
@@ -509,12 +514,13 @@ def main():
     """Main"""
     options = get_options()
     try:
-        if options.drop_tokens and _get_token_from_system():
+        if options.drop_tokens:
             try:
                 display(drop_tokens())
             except (AuthenticationError, ServerError, ConnectionError):
                 pass
-            _delete_token()
+            if os.path.isfile(_TOKEN_PATH):
+                _delete_token()
 
         elif options.note:
             note = ' '.join(options.note) if isinstance(options.note, (list, tuple)) else options.note
