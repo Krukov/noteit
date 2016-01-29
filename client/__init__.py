@@ -8,19 +8,39 @@ import getpass
 import json
 import os
 import platform
+import hashlib
 import select
+import string
 import sys
 import traceback
+from itertools import cycle
 from socket import gaierror
+from binascii import Error as AsciiError
 
 try:
     from httplib import HTTPConnection, HTTPSConnection  # Py<3
     from urllib import urlencode, quote
     from socket import error as ConnectionError
     input = raw_input
+
+    from itertools import izip
+    zip = izip
+
+    def base64encode(message):
+        return base64.urlsafe_b64encode(message)
+
+    def base64decode(message):
+        return base64.urlsafe_b64decode(message.encode())
+
 except ImportError:
     from http.client import HTTPConnection, HTTPSConnection  # Py>=3
     from urllib.parse import urlencode, quote
+
+    def base64encode(message):
+        return base64.urlsafe_b64encode(message.encode()).decode()
+
+    def base64decode(message):
+        return base64.urlsafe_b64decode(message).decode()
 
 
 _DEBUG = False
@@ -29,10 +49,14 @@ _PASS_CACHE_KWARG = 'not_cached'
 __VERSION__ = '0.11.0'
 
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
+ALPHA = string.ascii_letters + string.digits + '=_-'
+
 
 _ANONYMOUS_USER_AGENT = 'anonymous'
 _HOST_ENV_VALUE = 'NOTEIT_HOST'
-_TOKEN_PATH = os.path.expanduser('~/.noteit/noteit.tkn')
+_PATH = os.path.expanduser('~/.noteit/')
+_TOKEN_PATH = os.path.join(_PATH, 'noteit.tkn')
+_KEY_PATH = os.path.join(_PATH, 'enc')
 _TOKEN_ENV_VALUE = 'NOTEIT_TOKEN'
 _CONF_LINK = 'https://raw.githubusercontent.com/Krukov/noteit/stable/.conf.json'
 _USER_AGENT_HEADER = 'User-Agent'
@@ -48,7 +72,7 @@ _URLS_MAP = {
     'report': '/report',
 }
 _SUCCESS = range(200, 206)
-_TEMPLATE = '{n.alias}: {n.text}'
+_TEMPLATE = '{alias}: {text}'
 
 
 class AuthenticationError(Exception):
@@ -83,7 +107,8 @@ def get_notes():
     """Return user's notes as string"""
     notes, status = do_request(_URLS_MAP['get_notes'])
     if status == 200:
-        return '>' + '\n>'.join(_TEMPLATE.format(n=type('Note', (), n)) for n in json.loads(notes))
+        return '>' + '\n>'.join(_TEMPLATE.format(alias=n['alias'], text=_decrypt_note(n['text']))
+                                for n in json.loads(notes))
     elif status == 204:
         return "You do not have notes"
     raise Exception('Error at get_notes method: {} {}'.format(status, notes))
@@ -93,7 +118,7 @@ def get_note(number_or_alias):
     """Return user note of given number (number in [1..5]) or alias"""
     note, status = do_request(_URLS_MAP['get_note'].format(i=number_or_alias))
     if status in _SUCCESS:
-        return json.loads(note)['text']
+        return _decrypt_note(json.loads(note)['text'])
     elif status == 404:
         return "No note with requested alias"
     raise Exception('Error at get_note method: {} {}'.format(status, note))
@@ -114,12 +139,12 @@ def get_last_note():
     """Return last saved note"""
     notes, status = do_request(_URLS_MAP['get_notes'])
     if status in _SUCCESS:
-        return json.loads(notes)[0]['text']
+        return _decrypt_note(json.loads(notes)[0]['text'])
 
 
 def create_note(note, alias=None):
     """Make request for saving note"""
-    data = {'text': note}
+    data = {'text': _encrypt_note(note)}
     if alias:
         data['alias'] = alias
     responce, status = do_request(_URLS_MAP['get_notes'], method=POST, data=data)
@@ -270,17 +295,46 @@ def _get_host():
     return host
 
 
+@cached_function
 def _get_password():
     """Return password from argument or asks user for it"""
     return get_options().password or getpass.getpass('Input your password: ')
 
 
+@cached_function
 def _get_user():
     """Return user from argument or asks user for it"""
     return get_options().user or _get_from_stdin('Input username: ')
 
 
 @cached_function
+def _get_key():
+    """Return key to encode/decode from argument or from local"""
+    key = get_options().key
+    if key:
+        if not os.path.isfile(key):
+            return key
+        with open(key) as key_file:
+            return key_file.read()
+    if os.path.isfile(_KEY_PATH):
+        with open(_KEY_PATH) as key_file:
+            return key_file.read()
+
+
+def _md5(message):
+    md5 = hashlib.md5()
+    md5.update(message.encode())
+    return md5.hexdigest()
+
+def _save_key():
+    password = _md5(_md5(_get_password()))
+
+    if not os.path.exists(_PATH):
+        os.makedirs(_PATH)
+    with open(_KEY_PATH, 'w') as key_file:
+        key_file.write(password)
+
+
 def _get_credentials():
     """Return username and password"""
     return _get_user(), _get_password()
@@ -314,8 +368,8 @@ def _get_token_from_system():
 
 def _save_token(token):
     """Save token to file"""
-    if not os.path.exists(os.path.dirname(_TOKEN_PATH)):
-        os.makedirs(os.path.dirname(_TOKEN_PATH))
+    if not os.path.exists(_PATH):
+        os.makedirs(_PATH)
     with open(_TOKEN_PATH, 'w') as token_file:
         token_file.write(token)
     return True
@@ -343,6 +397,7 @@ def _get_headers():
         headers[_TOKEN_HEADER] = b'token ' + _get_token_from_system().encode('ascii')
     else:
         headers[_AUTH_HEADER] = _get_encoding_basic_credentials()
+        _save_key()
     return headers
 
 
@@ -369,6 +424,41 @@ def _is_debug():
 
 def _format_alias(alias):
     return quote(alias, safe='')
+
+
+def _encrypt(message, key):
+    """Encrypt message with b64encoding and {} alg"""
+    message = base64encode(message)
+    crypted = ''
+    for pair in zip(message, cycle(key)):
+        total = ALPHA.index(pair[0]) + ALPHA.index(pair[1])
+        crypted += ALPHA[total % len(ALPHA)]
+    return base64encode(crypted)
+
+
+def _encrypt_note(note):
+    if not note or get_options().do_not_encrypt or not _get_key():
+        return note
+    return _encrypt(note, _get_key())
+
+
+def _decrypt(message, key):
+    """Decrypt message with b64decoding and {} alg"""
+    message = base64decode(message)
+    decrypted = ''
+    for pair in zip(message, cycle(key)):
+        total = ALPHA.index(pair[0]) - ALPHA.index(pair[1])
+        decrypted += ALPHA[total % len(ALPHA)]
+    return base64decode(decrypted)
+
+
+def _decrypt_note(note):
+    if not note or get_options().do_not_encrypt or not _get_key():
+        return note
+    try:
+        return _decrypt(note, _get_key())
+    except (UnicodeDecodeError, TypeError, AsciiError):
+        return 'Error - can not decrypt note: {0}'.format(note)
 
 
 def get_options_parser():
@@ -398,6 +488,9 @@ def get_options_parser():
                         action='store_true')
     parser.add_argument('-i', '--ignore', help='if set, tool will ignore local token',
                         action='store_true')
+    parser.add_argument('--do-not-encrypt', help='disable encrypting/decrypting notes',
+                        action='store_true')
+    parser.add_argument('-k', '--key', help='Key to encrypting/decrypting notes (default is password base)')
 
     parser.add_argument('--anon', help='do not add OS and other info to agent header',
                         action='store_true')
