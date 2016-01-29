@@ -51,7 +51,7 @@ __VERSION__ = '0.11.0'
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 ALPHA = string.ascii_letters + string.digits + '=_-'
 
-
+_TIMEOUT = 5
 _ANONYMOUS_USER_AGENT = 'anonymous'
 _HOST_ENV_VALUE = 'NOTEIT_HOST'
 _PATH = os.path.expanduser('~/.noteit/')
@@ -253,7 +253,7 @@ def _get_connection():
     else:
         connection = HTTPConnection
         host = host.replace('http://', '')
-    return connection(host)
+    return connection(host, timeout=_TIMEOUT)
 
 
 def _make_request(url, method=GET, data=None, headers=None):
