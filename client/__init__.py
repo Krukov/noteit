@@ -57,6 +57,8 @@ _HOST_ENV_VALUE = 'NOTEIT_HOST'
 _PATH = os.path.expanduser('~/.noteit/')
 _TOKEN_PATH = os.path.join(_PATH, 'noteit.tkn')
 _KEY_PATH = os.path.join(_PATH, 'enc')
+_CACHE_PATH = os.path.join(_PATH, '_notes')
+
 _TOKEN_ENV_VALUE = 'NOTEIT_TOKEN'
 _CONF_LINK = 'https://raw.githubusercontent.com/Krukov/noteit/stable/.conf.json'
 _USER_AGENT_HEADER = 'User-Agent'
@@ -105,8 +107,18 @@ def display(out, stdout=sys.stdout):
 
 def get_notes():
     """Return user's notes as string"""
-    notes, status = do_request(_URLS_MAP['get_notes'])
+    try:
+        notes, status = do_request(_URLS_MAP['get_notes'])
+    except (ConnectionError, ServerError):
+        notes = _get_notes_from_cache()
+        status = 200
+        if notes is None:
+            raise
+        elif not notes:
+            status = 204
+
     if status == 200:
+        _cache_notes(notes)
         return '>' + '\n>'.join(_TEMPLATE.format(alias=n['alias'], text=_decrypt_note(n['text']))
                                 for n in json.loads(notes))
     elif status == 204:
@@ -116,7 +128,16 @@ def get_notes():
 
 def get_note(number_or_alias):
     """Return user note of given number (number in [1..5]) or alias"""
-    note, status = do_request(_URLS_MAP['get_note'].format(i=number_or_alias))
+    try:
+        note, status = do_request(_URLS_MAP['get_note'].format(i=number_or_alias))
+    except (ConnectionError, ServerError):
+        note = _get_note_from_cache(number_or_alias)
+        status = 200
+        if note is None:
+            raise
+        elif not note:
+            status = 204
+
     if status in _SUCCESS:
         return _decrypt_note(json.loads(note)['text'])
     elif status == 404:
@@ -319,6 +340,7 @@ def _get_key():
     if os.path.isfile(_KEY_PATH):
         with open(_KEY_PATH) as key_file:
             return key_file.read()
+    return _get_secret_hash()
 
 
 def _md5(message):
@@ -326,15 +348,17 @@ def _md5(message):
     md5.update(message.encode())
     return md5.hexdigest()
 
+
+@cached_function
+def _get_secret_hash():
+    return _md5(_md5(_get_user() + _get_password()))
+
+
 def _save_key():
     if os.path.isfile(_KEY_PATH):
         return
-
-    password = _md5(_md5(_get_password()))
-    if not os.path.exists(_PATH):
-        os.makedirs(_PATH)
-    with open(_KEY_PATH, 'w') as key_file:
-        key_file.write(password)
+    password = _get_secret_hash()
+    _save_file_or_ignore(_KEY_PATH, password)
 
 
 def _get_credentials():
@@ -359,6 +383,7 @@ def _generate_user_agent_with_info():
     ])
 
 
+@cached_function
 def _get_token_from_system():
     """Return token from file"""
     if _TOKEN_ENV_VALUE in os.environ:
@@ -372,11 +397,7 @@ def _get_token_from_system():
 
 def _save_token(token):
     """Save token to file"""
-    if not os.path.exists(_PATH):
-        os.makedirs(_PATH)
-    with open(_TOKEN_PATH, 'w') as token_file:
-        token_file.write(token)
-    return True
+    _save_file_or_ignore(_TOKEN_PATH, token)
 
 
 def _delete_token():
@@ -424,6 +445,37 @@ def _is_debug():
     if _DEBUG:
         return True
     return '--debug' in sys.argv
+
+
+def _cache_notes(notes):
+    """Save notes in local file"""
+    _save_file_or_ignore(_CACHE_PATH, notes)
+
+
+def _get_notes_from_cache():
+    if not os.path.isfile(_CACHE_PATH):
+        return
+    with open(_CACHE_PATH) as _file:
+        return _file.read()
+
+
+def _get_note_from_cache(alias):
+    if not os.path.isfile(_CACHE_PATH):
+        return
+    with open(_CACHE_PATH) as _file:
+        notes = {item['alias']: item['text'] for item in json.loads(_file.read())}
+    note = notes.get(alias, None)
+    if note:
+        return json.dumps({'text': note})
+
+
+def _save_file_or_ignore(path, content):
+    if not os.path.isdir(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
+    if get_options().do_not_save:
+        return
+    with open(path, 'w') as _file:
+        _file.write(content)
 
 
 def _format_alias(alias):
@@ -489,7 +541,7 @@ def get_options_parser():
                         action='store_true')
     parser.add_argument('--token', help='for manual setting token')
 
-    parser.add_argument('--do-not-save', help='disable savings token locally',
+    parser.add_argument('--do-not-save', help='disable savings any data locally',
                         action='store_true')
     parser.add_argument('-i', '--ignore', help='if set, tool will ignore local token',
                         action='store_true')
