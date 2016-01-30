@@ -1,30 +1,49 @@
 ======================================
 noteit - create and get notes anywhere 
 ======================================
-.. image:: https://img.shields.io/badge/version-beta-yellow.svg
-.. image:: https://travis-ci.org/Krukov/noteit-backend.svg?branch=master
-    :target: https://travis-ci.org/Krukov/noteit-backend
-.. image:: https://img.shields.io/coveralls/Krukov/noteit-backend.svg
-    :target: https://coveralls.io/r/Krukov/noteit-backend
 
---------------------------------
-The tool for simple store notes
---------------------------------
+-------------------------------------
+Make Notes with CLI (zero dependence)
+------------------------------------
 
 I created this tool for my own purposes, but I will be glad if you'll use it too.
 
 I love commandline tools like `howdoi <https://github.com/gleitz/howdoi>`_ , they are really awesome.
-Sometimes it is nesessary to note something simple and usefull: commands like *tar zxvf* or any password (it is bad idea). That will be great, if you could make a note simple and fast, and then get it anywhere. I hope, you will enjoy my tool!
+Sometimes it is nesessary to note something simple and usefull: commands like *tar zxvf* or any password (it is bad idea). That will be great, if you could make a note simple and fast, and then get it anywhere. I hope, you will enjoy this tool!
 
 
-How to
-=================
+Why
+===
 
-Install
------------------
+* Minimal dependence, all you need is python :love:
+* Easy to install (curl --silent --show-error --retry 5 http://{}/install.sh | sudo sh) :sh: 
+* Easy to use
+* Secure. Encript your notes by default (you can use your own key) :key:
+* CLI - that's asesome. Work at all platforms (I hope)
+
+DEMO HERE
 
 
-There are 2 ways to install this tool:
+How
+===
+
+it works
+--------
+
+When you run noteit at first time he goes to the noteit-backend host with baseauth headers and automaticaly register you at service. Arter he get token from server and save it localy at your home directory, generate and save double md5 hash of your credantions for continue use by key for using by encryption key. Than noteit using saved token for authorization. All encrypted notes storing at noteit backend server, thats why you can get it enywhere you want. All notes have alias, you can definde it by option '-a' or backend will generate random alias.
+
+
+security
+--------
+
+When you use password passing from option or inputed for promt, using baseauth, that is why I recomend you use long password with 6 or more ramdom simvols.
+All notes encript by saved hash of you password (at backent stored another hash) or by key from '--key' option. Manualy you can disable encryption with option '--do-not-encrypt'.
+
+
+to install
+----------
+
+There are 3 ways to install this tool:
 
 * simple/true/pythonic way:
 
@@ -45,8 +64,9 @@ or just
 
 	$ curl --silent --show-error --retry 5 {noteit_host}/install.sh | sudo sh
 
-Using
-------------
+
+to use
+------
 
 ::
 
@@ -59,21 +79,25 @@ Using
 	$ /# echo "Noteit can get note from pipe" | noteit
 	>Note saved
 	$ /# noteit 
-	>1: Noteit can get note from pipe
-	>2: My first note
+	>rsf: Noteit can get note from pipe
+	>temme: My first note
 	$ /# noteit echo "You can run it"
 	>Note saved
 	$ /# noteit -l | sh
 	You can run it
 	$ /# noteit Create note with alias -a alias
 	>Note saved
+	$ /# noteit
+	>alias: Create note with alias
+	>rsf: Noteit can get note from pipe
+	>temme: My first note
 	$ /# noteit -a alias
 	Create note with alias
-	
-	
+
 
 
 *FUTURE*
 ==========
- - save files
- - encript notes
+ - simple caching
+ - https!!! DONATE?
+ - save files DONATE?
