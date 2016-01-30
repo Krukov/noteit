@@ -495,9 +495,9 @@ def get_options_parser():
                         action='store_true')
     parser.add_argument('--do-not-encrypt', help='disable encrypting/decrypting notes',
                         action='store_true')
-    parser.add_argument('-k', '--key', help='Key to encrypting/decrypting notes (default is password base)')
+    parser.add_argument('-k', '--key', help='key to encrypting/decrypting notes (default is password base)')
 
-    parser.add_argument('--anon', help='do not add OS and other info to agent header',
+    parser.add_argument('--anon', help='do not add OS and other info to user-agent header',
                         action='store_true')
     parser.add_argument('-r', '--report', help=argparse.SUPPRESS, action='store_true')
 
