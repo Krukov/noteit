@@ -8,7 +8,7 @@ Make Notes with CLI (zero dependence)
 I created this tool for my own purposes, but I will be glad if you'll use it too.
 
 I love commandline tools like `howdoi <https://github.com/gleitz/howdoi>`_ , they are really awesome.
-Sometimes it is necessary to note something simple and useful: commands like *tar zxvf* or any password (it is bad idea). That will be great, if you could make a note simple and fast, and then get it anywhere. I hope, you will enjoy this tool!
+Sometimes it is necessary to note something simple and useful: commands like *tar zxvf* or any password. That will be great, if you could make a note simple and fast, and then get it anywhere. I hope, you will enjoy this tool!
 
 
 Why
@@ -21,6 +21,7 @@ Why
 * CLI - that's awesome. Work at all platforms (I hope) :heart:
 
 
+. image:: https://github.com/Krukov/noteit/raw/master/demo.gif
 
 
 How
