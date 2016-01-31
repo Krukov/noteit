@@ -21,7 +21,7 @@ Why
 * CLI - that's awesome. Work at all platforms (I hope) :heart:
 
 
-. image:: https://github.com/Krukov/noteit/raw/master/demo.gif
+.. image:: https://github.com/Krukov/noteit/raw/master/demo.gif
 
 
 How
@@ -40,8 +40,7 @@ All notes have alias, you can determine it by option '-a' or backend will genera
 security
 --------
 
-When you use password passing from option or injected, using basic auth, that is why I recommend you use long password
- with 6 or more random symbols.
+When you use password passing from option or injected, using basic auth, that is why I recommend you use long password with 6 or more random symbols.
 All notes encrypt by saved hash of you password (at backend stored another hash) or by key from '--key' option.
 Manually you can disable encryption with option '--do-not-encrypt'.
 
