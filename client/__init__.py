@@ -109,7 +109,7 @@ def get_notes():
     """Return user's notes as string"""
     try:
         notes, status = do_request(_URLS_MAP['get_notes'])
-    except (ConnectionError, ServerError):
+    except (ConnectionError, ServerError, gaierror):
         notes = _get_notes_from_cache()
         status = 200
         if notes is None:
@@ -130,7 +130,7 @@ def get_note(number_or_alias):
     """Return user note of given number (number in [1..5]) or alias"""
     try:
         note, status = do_request(_URLS_MAP['get_note'].format(i=number_or_alias))
-    except (ConnectionError, ServerError):
+    except (ConnectionError, ServerError, gaierror):
         note = _get_note_from_cache(number_or_alias)
         status = 200
         if note is None:
@@ -301,16 +301,13 @@ def _get_host():
     host = get_options().host or os.environ.get('NOTEIT_HOST')
     if not host:
         #  Get host from .conf file from repo
-        try:
-            conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
-            conn.request(GET, _CONF_LINK)
-            request = conn.getresponse()
-            conf_from_git = request.read().decode('ascii')
-            host = json.loads(conf_from_git)['host']
-            if host.endswith('/'):
-                host = host[:-1]
-        except gaierror:
-            sys.exit("Noteit requires internet connection")
+        conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
+        conn.request(GET, _CONF_LINK)
+        request = conn.getresponse()
+        conf_from_git = request.read().decode('ascii')
+        host = json.loads(conf_from_git)['host']
+        if host.endswith('/'):
+            host = host[:-1]
     if not os.environ.get('NOTEIT_HOST'):
         os.environ['NOTEIT_HOST'] = host
     return host
@@ -596,6 +593,8 @@ def main():
 
     except KeyboardInterrupt:
         sys.exit('\n')
+    except gaierror:
+        sys.exit("Noteit requires internet connection")
     except AuthenticationError:
         sys.exit('Error in authentication. Username maybe occupied')
     except ServerError:
