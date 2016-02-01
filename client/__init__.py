@@ -46,7 +46,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.14.0'
+__VERSION__ = '0.14.1'
 
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 ALPHA = string.ascii_letters + string.digits + '=_-'
@@ -109,7 +109,7 @@ def get_notes():
     """Return user's notes as string"""
     try:
         notes, status = do_request(_URLS_MAP['get_notes'])
-    except (ConnectionError, ServerError):
+    except (ConnectionError, ServerError, gaierror):
         notes = _get_notes_from_cache()
         status = 200
         if notes is None:
@@ -130,7 +130,7 @@ def get_note(number_or_alias):
     """Return user note of given number (number in [1..5]) or alias"""
     try:
         note, status = do_request(_URLS_MAP['get_note'].format(i=number_or_alias))
-    except (ConnectionError, ServerError):
+    except (ConnectionError, ServerError, gaierror):
         note = _get_note_from_cache(number_or_alias)
         status = 200
         if note is None:
@@ -301,16 +301,13 @@ def _get_host():
     host = get_options().host or os.environ.get('NOTEIT_HOST')
     if not host:
         #  Get host from .conf file from repo
-        try:
-            conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
-            conn.request(GET, _CONF_LINK)
-            request = conn.getresponse()
-            conf_from_git = request.read().decode('ascii')
-            host = json.loads(conf_from_git)['host']
-            if host.endswith('/'):
-                host = host[:-1]
-        except gaierror:
-            sys.exit("Noteit requires internet connection")
+        conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
+        conn.request(GET, _CONF_LINK)
+        request = conn.getresponse()
+        conf_from_git = request.read().decode('ascii')
+        host = json.loads(conf_from_git)['host']
+        if host.endswith('/'):
+            host = host[:-1]
     if not os.environ.get('NOTEIT_HOST'):
         os.environ['NOTEIT_HOST'] = host
     return host
@@ -463,7 +460,7 @@ def _get_note_from_cache(alias):
     if not os.path.isfile(_CACHE_PATH):
         return
     with open(_CACHE_PATH) as _file:
-        notes = {item['alias']: item['text'] for item in json.loads(_file.read())}
+        notes = dict((item['alias'], item['text']) for item in json.loads(_file.read()))
     note = notes.get(alias, None)
     if note:
         return json.dumps({'text': note})
@@ -596,6 +593,8 @@ def main():
 
     except KeyboardInterrupt:
         sys.exit('\n')
+    except gaierror:
+        sys.exit("Noteit requires internet connection")
     except AuthenticationError:
         sys.exit('Error in authentication. Username maybe occupied')
     except ServerError:
