@@ -460,7 +460,7 @@ def _get_note_from_cache(alias):
     if not os.path.isfile(_CACHE_PATH):
         return
     with open(_CACHE_PATH) as _file:
-        notes = {item['alias']: item['text'] for item in json.loads(_file.read())}
+        notes = dict((item['alias'], item['text']) for item in json.loads(_file.read()))
     note = notes.get(alias, None)
     if note:
         return json.dumps({'text': note})
