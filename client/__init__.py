@@ -592,13 +592,11 @@ def main():
 
     except KeyboardInterrupt:
         sys.exit('\n')
-    except gaierror:
-        sys.exit("Noteit requires internet connection")
     except AuthenticationError:
         sys.exit('Error in authentication. Username maybe occupied')
     except ServerError:
         sys.exit('Sorry there is server error. Please, try again later')
-    except ConnectionError:
+    except (ConnectionError, gaierror):
         sys.exit('Something wrong with connection, check your internet connection or try again later')
     except Exception:
         if _is_debug():
