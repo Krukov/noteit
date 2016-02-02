@@ -19,7 +19,7 @@ commit:
 	git commit -am "Release auto commit. ver. $(shell python3.4 client/__init__.py --version| grep "\d+.\d+.\d+" -Po)"
 
 merge:
-	get merge master --no-edit
+	git merge master --no-edit
 
 gch_stable:
 	git checkout stable
