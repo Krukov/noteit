@@ -46,7 +46,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.14.1'
+__VERSION__ = '0.14.2'
 
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 ALPHA = string.ascii_letters + string.digits + '=_-'
@@ -334,7 +334,8 @@ def _get_key():
             return key
         with open(key) as key_file:
             return key_file.read()
-    if os.path.isfile(_KEY_PATH):
+
+    if not get_options().user and os.path.isfile(_KEY_PATH):
         with open(_KEY_PATH) as key_file:
             return key_file.read()
     return _get_secret_hash()
@@ -352,8 +353,6 @@ def _get_secret_hash():
 
 
 def _save_key():
-    if os.path.isfile(_KEY_PATH):
-        return
     password = _get_secret_hash()
     _save_file_or_ignore(_KEY_PATH, password)
 
@@ -593,13 +592,11 @@ def main():
 
     except KeyboardInterrupt:
         sys.exit('\n')
-    except gaierror:
-        sys.exit("Noteit requires internet connection")
     except AuthenticationError:
         sys.exit('Error in authentication. Username maybe occupied')
     except ServerError:
         sys.exit('Sorry there is server error. Please, try again later')
-    except ConnectionError:
+    except (ConnectionError, gaierror):
         sys.exit('Something wrong with connection, check your internet connection or try again later')
     except Exception:
         if _is_debug():
@@ -608,7 +605,7 @@ def main():
             sys.exit('Something went wrong! You can sent report to us with "-r" option')
         report(traceback.format_exc())
 
-    if not options.do_not_save and not _get_token_from_system() and not options.drop_tokens:
+    if options.user or (not options.do_not_save and not _get_token_from_system() and not options.drop_tokens):
         token = _get_token()
         if token:
             _save_token(token)
