@@ -509,7 +509,7 @@ def _decrypt_note(note):
         return note
     try:
         return _decrypt(note, _get_key())
-    except (UnicodeDecodeError, TypeError, AsciiError):
+    except (UnicodeDecodeError, TypeError, AsciiError, ValueError):
         return 'Error - can not decrypt note: {0}'.format(note)
 
 
