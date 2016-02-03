@@ -46,7 +46,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.14.2'
+__VERSION__ = '0.14.4'
 
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 ALPHA = string.ascii_letters + string.digits + '=_-'
@@ -75,6 +75,7 @@ _URLS_MAP = {
 }
 _SUCCESS = range(200, 206)
 _TEMPLATE = '{alias}: {text}'
+_CROP = 78
 
 
 class AuthenticationError(Exception):
@@ -119,8 +120,10 @@ def get_notes():
 
     if status == 200:
         _cache_notes(notes)
-        return '>' + '\n>'.join(_TEMPLATE.format(alias=n['alias'], text=_decrypt_note(n['text']))
-                                for n in json.loads(notes))
+        return '>' + '\n>'.join(
+            _TEMPLATE.format(alias=n['alias'], text=(lambda s: s[:_CROP] + ('...' if len(s) > _CROP else ''))(  _decrypt_note(n['text'])))
+                                for n in json.loads(notes)
+        )
     elif status == 204:
         return "You do not have notes"
     raise Exception('Error at get_notes method: {} {}'.format(status, notes))
@@ -509,7 +512,7 @@ def _decrypt_note(note):
         return note
     try:
         return _decrypt(note, _get_key())
-    except (UnicodeDecodeError, TypeError, AsciiError):
+    except (UnicodeDecodeError, TypeError, AsciiError, ValueError):
         return 'Error - can not decrypt note: {0}'.format(note)
 
 
