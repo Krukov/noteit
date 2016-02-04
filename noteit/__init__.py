@@ -1,5 +1,618 @@
 #!/usr/bin/env python
-import zlib, base64
-exec(zlib.decompress(base64.b64decode('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')))
-# Created by pyminifier (https://github.com/liftoff/pyminifier)
+# -*- encoding: utf-8 -*-
+from __future__ import print_function
 
+import argparse
+import base64
+import getpass
+import json
+import os
+import platform
+import hashlib
+import select
+import string
+import sys
+import traceback
+from itertools import cycle
+from socket import gaierror
+from binascii import Error as AsciiError
+
+try:
+    from httplib import HTTPConnection, HTTPSConnection  # Py<3
+    from urllib import urlencode, quote
+    from socket import error as ConnectionError
+    input = raw_input
+
+    from itertools import izip
+    zip = izip
+
+    def base64encode(message):
+        return base64.urlsafe_b64encode(message)
+
+    def base64decode(message):
+        return base64.urlsafe_b64decode(message.encode())
+
+except ImportError:
+    from http.client import HTTPConnection, HTTPSConnection  # Py>=3
+    from urllib.parse import urlencode, quote
+
+    def base64encode(message):
+        return base64.urlsafe_b64encode(message.encode()).decode()
+
+    def base64decode(message):
+        return base64.urlsafe_b64decode(message).decode()
+
+
+_DEBUG = False
+_CACHED_ATTR = '_cache'
+_PASS_CACHE_KWARG = 'not_cached'
+__VERSION__ = '0.14.4'
+
+GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
+ALPHA = string.ascii_letters + string.digits + '=_-'
+
+_TIMEOUT = 5
+_ANONYMOUS_USER_AGENT = 'anonymous'
+_HOST_ENV_VALUE = 'NOTEIT_HOST'
+_PATH = os.path.expanduser('~/.noteit/')
+_TOKEN_PATH = os.path.join(_PATH, 'noteit.tkn')
+_KEY_PATH = os.path.join(_PATH, 'enc')
+_CACHE_PATH = os.path.join(_PATH, '_notes')
+
+_TOKEN_ENV_VALUE = 'NOTEIT_TOKEN'
+_CONF_LINK = 'https://raw.githubusercontent.com/Krukov/noteit/stable/.conf.json'
+_USER_AGENT_HEADER = 'User-Agent'
+_CONTENT_TYPE_HEADER = 'Content-type'
+_AUTH_HEADER = 'Authorization'
+_TOKEN_HEADER = 'Authorization'
+_URLS_MAP = {
+    'create_note': '/notes',
+    'drop_tokens': '/drop_tokens',
+    'get_token': '/get_token',
+    'get_notes': '/notes',
+    'get_note': '/notes/{i}',
+    'report': '/report',
+}
+_SUCCESS = range(200, 206)
+_TEMPLATE = '{alias}: {text}'
+_CROP = 78
+
+
+class AuthenticationError(Exception):
+    """Error raising at wrong password """
+    pass
+
+
+class ServerError(Exception):
+    """Error if server is return 50x status"""
+    pass
+
+
+def cached_function(func):
+    """Decorator that cache function result at first call and return cached result other calls """
+
+    def _func(*args, **kwargs):
+        force = kwargs.pop(_PASS_CACHE_KWARG, False)
+        if not hasattr(func, _CACHED_ATTR) or force or _is_debug():
+            result = func(*args, **kwargs)
+            if result is not None:
+                setattr(func, _CACHED_ATTR, result)
+            return result
+        return getattr(func, _CACHED_ATTR)
+    return _func
+
+
+def display(out, stdout=sys.stdout):
+    stdout.write(out + '\n')
+
+
+def get_notes():
+    """Return user's notes as string"""
+    try:
+        notes, status = do_request(_URLS_MAP['get_notes'])
+    except (ConnectionError, ServerError, gaierror):
+        notes = _get_notes_from_cache()
+        status = 200
+        if notes is None:
+            raise
+        elif not notes:
+            status = 204
+
+    if status == 200:
+        _cache_notes(notes)
+        return '>' + '\n>'.join(
+            _TEMPLATE.format(alias=n['alias'], text=(lambda s: s[:_CROP] + ('...' if len(s) > _CROP else ''))(  _decrypt_note(n['text'])))
+                                for n in json.loads(notes)
+        )
+    elif status == 204:
+        return "You do not have notes"
+    raise Exception('Error at get_notes method: {} {}'.format(status, notes))
+
+
+def get_note(number_or_alias):
+    """Return user note of given number (number in [1..5]) or alias"""
+    try:
+        note, status = do_request(_URLS_MAP['get_note'].format(i=number_or_alias))
+    except (ConnectionError, ServerError, gaierror):
+        note = _get_note_from_cache(number_or_alias)
+        status = 200
+        if note is None:
+            raise
+        elif not note:
+            status = 204
+
+    if status in _SUCCESS:
+        return _decrypt_note(json.loads(note)['text'])
+    elif status == 404:
+        return "No note with requested alias"
+    raise Exception('Error at get_note method: {} {}'.format(status, note))
+
+
+def delete_note(number_or_alias):
+    """Delete/remove user note of given number (number in [1..5]) or alias"""
+    url = _URLS_MAP['get_note'].format(i=number_or_alias)
+    _, status = do_request(url, method=DELETE)
+    if status in _SUCCESS:
+        return "Note deleted"
+    elif status == 404:
+        return "No note with requested alias"
+    raise Exception('Error at delete_note method: {} {}'.format(status, number_or_alias))
+
+
+def get_last_note():
+    """Return last saved note"""
+    notes, status = do_request(_URLS_MAP['get_notes'])
+    if status in _SUCCESS:
+        return _decrypt_note(json.loads(notes)[0]['text'])
+
+
+def create_note(note, alias=None):
+    """Make request for saving note"""
+    data = {'text': _encrypt_note(note)}
+    if alias:
+        data['alias'] = alias
+    responce, status = do_request(_URLS_MAP['get_notes'], method=POST, data=data)
+    if status in _SUCCESS:
+        return 'Saved'
+    elif status in [406, 409]:
+        return json.loads(responce)['error']
+    raise Exception('Error at create_note method: {} {}'.format(status, responce))
+
+
+def report(tb):
+    """Make traceback and etc. to server"""
+    data = {'traceback': tb}
+    try:
+        _, status = do_request(_URLS_MAP['report'], method=POST, data=data)
+    except Exception:
+        data = urlencode(data).encode('ascii')
+        conn = _get_connection()
+        try:
+            headers = _get_headers()
+        except Exception:
+            headers = {}
+        headers.update({"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"})
+        conn.request(POST, _URLS_MAP['report'], body=data, headers=headers)
+        status = conn.getresponse().status
+
+    if status in _SUCCESS:
+        display('Thank you for reporting...')
+    else:
+        display('Error: can not be reported')
+
+
+def drop_tokens():
+    """Make request to recreate user's tokens"""
+    _, status = do_request(_URLS_MAP['drop_tokens'], method=POST)
+    if status in _SUCCESS:
+        return 'Tokens are deleted'
+    raise Exception('Error at drop_token method: {} {}'.format(status, _))
+
+
+def _get_token():
+    """Send request to get token and return it at success"""
+    token, status = do_request(_URLS_MAP['get_token'], method=POST)
+    if status in _SUCCESS:
+        return json.loads(token)['token']
+    else:
+        if get_options().report:
+            report('Error at token getting %s (%s)' % (token, status))
+        else:
+            sys.stderr.write('Can not get token, to report problem run with --report option\n')
+
+
+def registration(question_location):
+    """Asks user for answer the question at given location and send result """
+    prompt = "If you are not registered yet, please answer the question '{0}': ".format(do_request(question_location)[0])
+    answer = _get_from_stdin(prompt)
+    response, status = do_request(question_location, POST, {'answer': answer})
+    if status in _SUCCESS:
+        return True
+    return False
+
+
+# END API METHODS
+
+@cached_function
+def get_version():
+    """Return version of client"""
+    return __VERSION__
+
+
+def do_request(path, *args, **kwargs):
+    """Make request and handle response"""
+    kwargs.setdefault('headers', {}).update(_get_headers())
+    response = _make_request(path, *args, **kwargs)
+    response._attrs = path, args, kwargs  # for retrying
+    return _response_handler(response)
+
+
+def retry(response):
+    """Retry last response"""
+    return do_request(response._attrs[0], *response._attrs[1], **response._attrs[2])
+
+
+def _response_handler(response):
+    """Handle response status"""
+    response_body = response.read().decode('ascii')
+    response.close()
+    if response.status in [401, ]:
+        raise AuthenticationError
+    elif response.status > 500:
+        raise ServerError
+    elif response.status in [301, 302, 303, 307] and response._method != POST:
+        if registration(response.getheader('Location')):
+            return retry(response)
+        raise AuthenticationError
+    return response_body, response.status
+
+
+@cached_function
+def _get_connection():
+    """Create and return connection with host"""
+    host = _get_host()
+    if host.startswith('https://'):
+        host = host[8:]
+        connection = HTTPSConnection
+    else:
+        connection = HTTPConnection
+        host = host.replace('http://', '')
+    return connection(host, timeout=_TIMEOUT)
+
+
+def _make_request(url, method=GET, data=None, headers=None):
+    """Generate request and send it"""
+    headers = headers or {}
+    method = method.upper()
+    conn = _get_connection()
+    if data:
+        data = urlencode(data).encode('ascii')
+        if method == GET:
+            url = '?'.join([url, data.decode('ascii') or ''])
+            data = None
+
+    if method in [POST]:
+        headers.update({"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"})
+    conn.request(method, url, body=data, headers=headers)
+
+    return conn.getresponse()
+
+
+@cached_function
+def _get_host():
+    """Return noteit backend host"""
+    host = get_options().host or os.environ.get('NOTEIT_HOST')
+    if not host:
+        #  Get host from .conf file from repo
+        conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
+        conn.request(GET, _CONF_LINK)
+        request = conn.getresponse()
+        conf_from_git = request.read().decode('ascii')
+        host = json.loads(conf_from_git)['host']
+        if host.endswith('/'):
+            host = host[:-1]
+    if not os.environ.get('NOTEIT_HOST'):
+        os.environ['NOTEIT_HOST'] = host
+    return host
+
+
+@cached_function
+def _get_password():
+    """Return password from argument or asks user for it"""
+    return get_options().password or getpass.getpass('Input your password: ')
+
+
+@cached_function
+def _get_user():
+    """Return user from argument or asks user for it"""
+    return get_options().user or _get_from_stdin('Input username: ')
+
+
+@cached_function
+def _get_key():
+    """Return key to encode/decode from argument or from local"""
+    key = get_options().key
+    if key:
+        if not os.path.isfile(key):
+            return key
+        with open(key) as key_file:
+            return key_file.read()
+
+    if not get_options().user and os.path.isfile(_KEY_PATH):
+        with open(_KEY_PATH) as key_file:
+            return key_file.read()
+    return _get_secret_hash()
+
+
+def _md5(message):
+    md5 = hashlib.md5()
+    md5.update(message.encode())
+    return md5.hexdigest()
+
+
+@cached_function
+def _get_secret_hash():
+    return _md5(_md5(_get_user() + _get_password()))
+
+
+def _save_key():
+    password = _get_secret_hash()
+    _save_file_or_ignore(_KEY_PATH, password)
+
+
+def _get_credentials():
+    """Return username and password"""
+    return _get_user(), _get_password()
+
+
+@cached_function
+def _get_user_agent():
+    """Return User-Agent for request header"""
+    if get_options().anon:
+        return _ANONYMOUS_USER_AGENT
+    return _generate_user_agent_with_info()
+
+
+def _generate_user_agent_with_info():
+    """Generete User-Agent with environment info"""
+    return ' '.join([
+        '{0}/{1}'.format('Noteit', get_version()),
+        '{i[0]}-{i[1]}/{i[2]}-{i[5]}'.format(i=platform.uname()),
+        '{0}/{1}'.format(platform.python_implementation(), platform.python_version()),
+    ])
+
+
+@cached_function
+def _get_token_from_system():
+    """Return token from file"""
+    if _TOKEN_ENV_VALUE in os.environ:
+        return os.environ.get(_TOKEN_ENV_VALUE)
+    if get_options().token:
+        return get_options().token
+    if os.path.isfile(_TOKEN_PATH):
+        with open(_TOKEN_PATH) as _file:
+            return _file.read().strip()
+
+
+def _save_token(token):
+    """Save token to file"""
+    _save_file_or_ignore(_TOKEN_PATH, token)
+
+
+def _delete_token():
+    """Delete file with token"""
+    if os.path.exists(_TOKEN_PATH):
+        os.remove(_TOKEN_PATH)
+
+
+@cached_function
+def _get_encoding_basic_credentials():
+    """Return value of header for Basic Authentication"""
+    return b'basic ' + base64.b64encode(':'.join(_get_credentials()).encode('ascii'))
+
+
+def _get_headers():
+    """Return dict of headers for request"""
+    headers = {
+        _USER_AGENT_HEADER: _get_user_agent(),
+        _CONTENT_TYPE_HEADER: 'application/json'
+    }
+    if not get_options().user and not get_options().ignore and _get_token_from_system():
+        headers[_TOKEN_HEADER] = b'token ' + _get_token_from_system().encode('ascii')
+    else:
+        headers[_AUTH_HEADER] = _get_encoding_basic_credentials()
+        _save_key()
+    return headers
+
+
+def _get_from_stdin(text):
+    """communication with stdin"""
+    return input(text)
+
+
+def _get_from_pipe():
+    """Read stdin if pipe is open | """
+    try:
+        is_in_pipe = select.select([sys.stdin], [], [], 0.0)[0]
+    except (select.error, TypeError):
+        return
+    else:
+        return sys.stdin.read() if is_in_pipe else None
+
+
+def _is_debug():
+    if _DEBUG:
+        return True
+    return '--debug' in sys.argv
+
+
+def _cache_notes(notes):
+    """Save notes in local file"""
+    _save_file_or_ignore(_CACHE_PATH, notes)
+
+
+def _get_notes_from_cache():
+    if not os.path.isfile(_CACHE_PATH):
+        return
+    with open(_CACHE_PATH) as _file:
+        return _file.read()
+
+
+def _get_note_from_cache(alias):
+    if not os.path.isfile(_CACHE_PATH):
+        return
+    with open(_CACHE_PATH) as _file:
+        notes = dict((item['alias'], item['text']) for item in json.loads(_file.read()))
+    note = notes.get(alias, None)
+    if note:
+        return json.dumps({'text': note})
+
+
+def _save_file_or_ignore(path, content):
+    if not os.path.isdir(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
+    if get_options().do_not_save:
+        return
+    with open(path, 'w') as _file:
+        _file.write(content)
+
+
+def _format_alias(alias):
+    return quote(alias, safe='')
+
+
+def _encrypt(message, key):
+    """Encrypt message with b64encoding and {} alg"""
+    message = base64encode(message)
+    crypted = ''
+    for pair in zip(message, cycle(key)):
+        total = ALPHA.index(pair[0]) + ALPHA.index(pair[1])
+        crypted += ALPHA[total % len(ALPHA)]
+    return base64encode(crypted)
+
+
+def _encrypt_note(note):
+    if not note or get_options().do_not_encrypt or not _get_key():
+        return note
+    return _encrypt(note, _get_key())
+
+
+def _decrypt(message, key):
+    """Decrypt message with b64decoding and {} alg"""
+    message = base64decode(message)
+    decrypted = ''
+    for pair in zip(message, cycle(key)):
+        total = ALPHA.index(pair[0]) - ALPHA.index(pair[1])
+        decrypted += ALPHA[total % len(ALPHA)]
+    return base64decode(decrypted)
+
+
+def _decrypt_note(note):
+    if not note or get_options().do_not_encrypt or not _get_key():
+        return note
+    try:
+        return _decrypt(note, _get_key())
+    except (UnicodeDecodeError, TypeError, AsciiError, ValueError):
+        return 'Error - can not decrypt note: {0}'.format(note)
+
+
+def get_options_parser():
+    """Arguments definition"""
+    parser = argparse.ArgumentParser(description='Tool for creating notes', prog='noteit')
+
+    parser.add_argument('--version', action='version', version='%(prog)s ' + get_version(),
+                        help='displays the current version of %(prog)s and exit')
+    parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
+
+    parser.add_argument('note', metavar='NOTE', nargs='*', default=_get_from_pipe(),
+                        help='new note')
+
+    parser.add_argument('-u', '--user', help='username')
+    parser.add_argument('-p', '--password', help='password')
+    parser.add_argument('--host', help=argparse.SUPPRESS)
+
+    parser.add_argument('-l', '--last', help='display last note', action='store_true')
+    parser.add_argument('-a', '--alias', help='set alias for note / display note with given alias')
+    parser.add_argument('-d', '--delete', help='delete note', action='store_true')
+    parser.add_argument('-o', '--overwrite', help='overwrite note', action='store_true')
+
+    parser.add_argument('--drop-tokens', help='make all you tokens invalid',
+                        action='store_true')
+    parser.add_argument('--token', help='for manual setting token')
+
+    parser.add_argument('--do-not-save', help='disable savings any data locally',
+                        action='store_true')
+    parser.add_argument('-i', '--ignore', help='if set, tool will ignore local token',
+                        action='store_true')
+    parser.add_argument('--do-not-encrypt', help='disable encrypting/decrypting notes',
+                        action='store_true')
+    parser.add_argument('-k', '--key', help='key to encrypting/decrypting notes (default is password base)')
+
+    parser.add_argument('--anon', help='do not add OS and other info to user-agent header',
+                        action='store_true')
+    parser.add_argument('-r', '--report', help=argparse.SUPPRESS, action='store_true')
+
+    return parser
+
+
+@cached_function
+def get_options():
+    """Return parsed arguments"""
+    return get_options_parser().parse_args()
+
+
+def main():
+    """Main"""
+    options = get_options()
+    try:
+        if options.drop_tokens:
+            try:
+                display(drop_tokens())
+            except (AuthenticationError, ServerError, ConnectionError):
+                pass
+            if os.path.isfile(_TOKEN_PATH):
+                _delete_token()
+
+        elif options.note:
+            note = ' '.join(options.note) if isinstance(options.note, (list, tuple)) else options.note
+            alias = options.alias
+            if options.overwrite:
+                try:
+                    delete_note(_format_alias(alias))
+                except:
+                    pass
+            display(create_note(note, alias))
+
+        elif options.alias:
+            if options.delete:
+                display(delete_note(_format_alias(options.alias)))
+            else:
+                display(get_note(_format_alias(options.alias)))
+        elif options.last:
+            display(get_last_note())
+        elif not options.note:
+            display(get_notes())
+
+    except KeyboardInterrupt:
+        sys.exit('\n')
+    except AuthenticationError:
+        sys.exit('Error in authentication. Username maybe occupied')
+    except ServerError:
+        sys.exit('Sorry there is server error. Please, try again later')
+    except (ConnectionError, gaierror):
+        sys.exit('Something wrong with connection, check your internet connection or try again later')
+    except Exception:
+        if _is_debug():
+            raise
+        if not options.report:
+            sys.exit('Something went wrong! You can sent report to us with "-r" option')
+        report(traceback.format_exc())
+
+    if options.user or (not options.do_not_save and not _get_token_from_system() and not options.drop_tokens):
+        token = _get_token()
+        if token:
+            _save_token(token)
+
+
+if __name__ == '__main__':
+    main()
