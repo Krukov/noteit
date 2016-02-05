@@ -14,12 +14,13 @@ Sometimes it is necessary to note something simple and useful: commands like *ta
 Why
 ===
 
-* :package: Minimal dependence and size (about 7 kb), all you need is python
-* :snake: Support python 2.6, 2.7, 3.4 and upper (for 2.6 you need to install argparse package)
-* :rocket: Easy to install (curl --silent --show-error --retry 5 http://krukov.pythonanywhere.com//install.sh | sudo sh)
-* :beginner: Easy to use
-* :closed_lock_with_key: Secure. Encrypt your notes by default (you can use your own key)
+* \:package: Minimal dependence and size (about 7 kb), all you need is python
+* \:snake: Support python 2.6, 2.7, 3.4 and upper (for 2.6 you need to install argparse package)
+* \:rocket: Easy to install (curl --silent --show-error --retry 5 http://krukov.pythonanywhere.com//install.sh | sudo sh)
+* \:beginner: Easy to use
+* \:closed_lock_with_key: Secure. Encrypt your notes by default (you can use your own key)
 * >_ CLI - that's awesome. Work at all platforms (I hope)
+
 
 
 .. image:: https://github.com/Krukov/noteit/raw/master/demo.gif
@@ -104,7 +105,6 @@ to use
 
 *FUTURE*
 ==========
- - simple caching
  - https!!! DONATE?
  - colorize
  - save files DONATE?
