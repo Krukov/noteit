@@ -70,11 +70,12 @@ _URLS_MAP = {
     'drop_tokens': '/drop_tokens',
     'get_token': '/get_token',
     'get_notes': '/notes',
+    'get_notebook': '/notebook/{i}',
     'get_note': '/notes/{i}',
     'report': '/report',
 }
 _SUCCESS = range(200, 206)
-_TEMPLATE = '{alias}: {text}'
+_TEMPLATE = '{alias}: {text} {notebook}'
 _CROP = 78
 
 
@@ -106,12 +107,16 @@ def display(out, stdout=sys.stdout):
     stdout.write(out + '\n')
 
 
-def get_notes():
+def get_notes(notebook=None):
     """Return user's notes as string"""
+    data = {}
+    url = _URLS_MAP['get_notes']
+    if notebook:
+        url = _URLS_MAP['get_notebook'].format(i=notebook)
     try:
-        notes, status = do_request(_URLS_MAP['get_notes'])
+        notes, status = do_request(url)
     except (ConnectionError, ServerError, gaierror):
-        notes = _get_notes_from_cache()
+        notes = _get_notes_from_cache(notebook)
         status = 200
         if notes is None:
             raise
@@ -119,9 +124,9 @@ def get_notes():
             status = 204
 
     if status == 200:
-        _cache_notes(notes)
+        _cache_notes(notes, notebook)
         return '>' + '\n>'.join(
-            _TEMPLATE.format(alias=n['alias'], text=(lambda s: s[:_CROP] + ('...' if len(s) > _CROP else ''))(  _decrypt_note(n['text'])))
+            _TEMPLATE.format(alias=n['alias'], notebook=n['notebook'] or '', text=(lambda s: s[:_CROP] + ('...' if len(s) > _CROP else ''))(  _decrypt_note(n['text'])))
                                 for n in json.loads(notes)
         )
     elif status == 204:
@@ -166,11 +171,13 @@ def get_last_note():
         return _decrypt_note(json.loads(notes)[0]['text'])
 
 
-def create_note(note, alias=None):
+def create_note(note, alias=None, notebook=None):
     """Make request for saving note"""
     data = {'text': _encrypt_note(note)}
     if alias:
         data['alias'] = alias
+    if notebook:
+        data['notebook'] = notebook
     responce, status = do_request(_URLS_MAP['get_notes'], method=POST, data=data)
     if status in _SUCCESS:
         return 'Saved'
@@ -446,15 +453,21 @@ def _is_debug():
     return '--debug' in sys.argv
 
 
-def _cache_notes(notes):
+def _cache_notes(notes, notebook):
     """Save notes in local file"""
-    _save_file_or_ignore(_CACHE_PATH, notes)
+    path = _CACHE_PATH
+    if notebook:
+        path += '.' + notebook
+    _save_file_or_ignore(path, notes)
 
 
 def _get_notes_from_cache():
-    if not os.path.isfile(_CACHE_PATH):
+    path = _CACHE_PATH
+    if notebook:
+        path += '.' + notebook
+    if not os.path.isfile(path):
         return
-    with open(_CACHE_PATH) as _file:
+    with open(path) as _file:
         return _file.read()
 
 
@@ -533,6 +546,8 @@ def get_options_parser():
 
     parser.add_argument('-l', '--last', help='display last note', action='store_true')
     parser.add_argument('-a', '--alias', help='set alias for note / display note with given alias')
+    parser.add_argument('-n', '--notebook', help='set notebook for note / display notes with given notebook')
+
     parser.add_argument('-d', '--delete', help='delete note', action='store_true')
     parser.add_argument('-o', '--overwrite', help='overwrite note', action='store_true')
 
@@ -581,9 +596,9 @@ def main():
                     delete_note(_format_alias(alias))
                 except:
                     pass
-            display(create_note(note, alias))
+            display(create_note(note, alias, options.notebook))
 
-        elif options.alias:
+        elif options.alias is not None:
             if options.delete:
                 display(delete_note(_format_alias(options.alias)))
             else:
@@ -591,7 +606,7 @@ def main():
         elif options.last:
             display(get_last_note())
         elif not options.note:
-            display(get_notes())
+            display(get_notes(options.notebook))
 
     except KeyboardInterrupt:
         sys.exit('\n')
