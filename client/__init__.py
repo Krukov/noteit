@@ -75,7 +75,7 @@ _URLS_MAP = {
     'report': '/report',
 }
 _SUCCESS = range(200, 206)
-_TEMPLATE = '{alias}: {text} {notebook}'
+_TEMPLATE = '{notebook}{alias}: {text}'
 _CROP = 78
 
 
@@ -125,13 +125,23 @@ def get_notes(notebook=None):
 
     if status == 200:
         _cache_notes(notes, notebook)
-        return '>' + '\n>'.join(
-            _TEMPLATE.format(alias=n['alias'], notebook=n['notebook'] or '', text=(lambda s: s[:_CROP] + ('...' if len(s) > _CROP else ''))(  _decrypt_note(n['text'])))
-                                for n in json.loads(notes)
-        )
+        out = ''
+        for note in json.loads(notes):
+            out += '>'
+            if not notebook and note['notebook']:
+                note['notebook'] = ('[' + note['notebook'] + ']')
+            else:
+                note['notebook'] = ''
+            text = _decrypt_note(note['text'])
+            note['text'] = text[:_CROP] + ('...' if len(text) > _CROP else '')
+            out += _TEMPLATE.format(**note)
+            out += '\n'
+        return out[:-1]
     elif status == 204:
+        if notebook:
+            return "You do not have notes in the '{0}' notebook".format(notebook)
         return "You do not have notes"
-    raise Exception('Error at get_notes method: {} {}'.format(status, notes))
+    raise Exception('Error at get_notes method: {0} {1}'.format(status, notes))
 
 
 def get_note(number_or_alias):
@@ -161,7 +171,7 @@ def delete_note(number_or_alias):
         return "Note deleted"
     elif status == 404:
         return "No note with requested alias"
-    raise Exception('Error at delete_note method: {} {}'.format(status, number_or_alias))
+    raise Exception('Error at delete_note method: {0} {1}'.format(status, number_or_alias))
 
 
 def get_last_note():
@@ -177,13 +187,13 @@ def create_note(note, alias=None, notebook=None):
     if alias:
         data['alias'] = alias
     if notebook:
-        data['notebook'] = notebook
+        data['_notebook'] = notebook
     responce, status = do_request(_URLS_MAP['get_notes'], method=POST, data=data)
     if status in _SUCCESS:
         return 'Saved'
     elif status in [406, 409]:
         return json.loads(responce)['error']
-    raise Exception('Error at create_note method: {} {}'.format(status, responce))
+    raise Exception('Error at create_note method: {0} {1}'.format(status, responce))
 
 
 def report(tb):
@@ -213,7 +223,7 @@ def drop_tokens():
     _, status = do_request(_URLS_MAP['drop_tokens'], method=POST)
     if status in _SUCCESS:
         return 'Tokens are deleted'
-    raise Exception('Error at drop_token method: {} {}'.format(status, _))
+    raise Exception('Error at drop_token method: {0} {1}'.format(status, _))
 
 
 def _get_token():
@@ -223,7 +233,7 @@ def _get_token():
         return json.loads(token)['token']
     else:
         if get_options().report:
-            report('Error at token getting %s (%s)' % (token, status))
+            report('Error at token getting {0} ({1})'.format(token, status))
         else:
             sys.stderr.write('Can not get token, to report problem run with --report option\n')
 
@@ -623,7 +633,7 @@ def main():
             sys.exit('Something went wrong! You can sent report to us with "-r" option')
         report(traceback.format_exc())
 
-    if options.user or (not options.do_not_save and not _get_token_from_system() and not options.drop_tokens):
+    if not options.do_not_save and (options.user or (not _get_token_from_system() and not options.drop_tokens)):
         token = _get_token()
         if token:
             _save_token(token)
