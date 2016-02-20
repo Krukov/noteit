@@ -471,7 +471,7 @@ def _cache_notes(notes, notebook):
     _save_file_or_ignore(path, notes)
 
 
-def _get_notes_from_cache():
+def _get_notes_from_cache(notebook):
     path = _CACHE_PATH
     if notebook:
         path += '.' + notebook
