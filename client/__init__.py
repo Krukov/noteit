@@ -30,7 +30,7 @@ try:
         return base64.urlsafe_b64encode(message)
 
     def base64decode(message):
-        return base64.urlsafe_b64decode(message.encode())
+        return base64.urlsafe_b64decode(message.encode()).decode('utf-8')
 
 except ImportError:
     from http.client import HTTPConnection, HTTPSConnection  # Py>=3
@@ -136,9 +136,9 @@ def get_notes(all=False, notebook=None, quiet=False):
         out = template.replace(u'<', u'^').format(text='NOTE', alias='ALIAS', notebook='NOTEBOOK') + '\n' * 2
         out = '' if quiet else out
         for note in json.loads(notes):
-            text = _decrypt_note(note['text']).decode('utf-8').replace('\n', ' ')
-            note['text'] = text[:_CROP] + (u'...' if len(text) > _CROP else '')
-            note['notebook'] = note['notebook'] or ''
+            text = _decrypt_note(note['text']).replace(u'\n', u' ')
+            note['text'] = text[:_CROP] + (u'...' if len(text) > _CROP else'')
+            note['notebook'] = note.get('notebook') or ''
             out += template.format(**note)
             out += '\n'
         return out[:-1]
@@ -540,7 +540,7 @@ def _decrypt_note(note):
         return note
     try:
         return _decrypt(note, _get_key())
-    except (UnicodeDecodeError, TypeError, AsciiError, ValueError):
+    except (UnicodeDecodeError, TypeError, AsciiError, ValueError, AttributeError):
         return 'Error - can not decrypt note: {0}'.format(note)
 
 
