@@ -46,7 +46,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.14.4'
+__VERSION__ = '0.15.0'
 
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 ALPHA = string.ascii_letters + string.digits + '=_-'
@@ -109,7 +109,6 @@ def display(out, stdout=sys.stdout):
 
 def get_notes(notebook=None):
     """Return user's notes as string"""
-    data = {}
     url = _URLS_MAP['get_notes']
     if notebook:
         url = _URLS_MAP['get_notebook'].format(i=notebook)
