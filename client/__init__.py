@@ -70,13 +70,16 @@ _URLS_MAP = {
     'drop_tokens': '/drop_tokens',
     'get_token': '/get_token',
     'get_notes': '/notes',
-    'get_notebook': '/notebook/{i}',
-    'get_note': '/notes/{i}',
+    'get_notebook': u'/notebook/{i}',
+    'get_note': u'/notes/{i}',
     'report': '/report',
 }
 _SUCCESS = range(200, 206)
-_TEMPLATE = '{notebook}{alias}: {text}'
-_CROP = 78
+_TEMPLATE = u' {alias:^20} {text:<80}'
+_TEMPLATE_N = u' {notebook:^12} {alias:^13} {text:<80}'
+_TEMPLATE_NA = u' {notebook:^20} {alias:^13}'
+_TEMPLATE_A = u'✓ {alias}'
+_CROP = 77
 
 
 class AuthenticationError(Exception):
@@ -110,11 +113,14 @@ def display(out, stdout=sys.stdout):
 def get_notes(all=False, notebook=None, quiet=False):
     """Return user's notes as string"""
     url = _URLS_MAP['get_notes']
+    template = _TEMPLATE if not quiet else _TEMPLATE_A
     data = None
     if notebook:
         data = {'notebook': notebook}
     elif all:
+        template = _TEMPLATE_N if not quiet else _TEMPLATE_NA
         data = {'all': True}
+
     try:
         notes, status = do_request(url, data=data)
     except (ConnectionError, ServerError, gaierror):
@@ -127,20 +133,13 @@ def get_notes(all=False, notebook=None, quiet=False):
 
     if status == 200:
         _cache_notes(notes, notebook)
-        out = ''
+        out = template.replace(u'<', u'^').format(text='NOTE', alias='ALIAS', notebook='NOTEBOOK') + '\n' * 2
+        out = '' if quiet else out
         for note in json.loads(notes):
-            out += '>'
-            if quiet:
-                note['text'] = ''
-                note['notebook'] = ''
-            else:
-                if not notebook and note.get('notebook', None):
-                    note['notebook'] = ('[' + note['notebook'] + '] ')
-                else:
-                    note['notebook'] = ''
-                text = _decrypt_note(note['text'])
-                note['text'] = text[:_CROP] + ('...' if len(text) > _CROP else '')
-            out += _TEMPLATE.format(**note)
+            text = _decrypt_note(note['text']).decode('utf-8').replace('\n', ' ')
+            note['text'] = text[:_CROP] + (u'...' if len(text) > _CROP else '')
+            note['notebook'] = note['notebook'] or ''
+            out += template.format(**note)
             out += '\n'
         return out[:-1]
     elif status == 204:
@@ -166,7 +165,7 @@ def get_note(number_or_alias):
         return _decrypt_note(json.loads(note)['text'])
     elif status == 404:
         return "No note with requested alias"
-    raise Exception('Error at get_note method: {} {}'.format(status, note))
+    raise Exception(u'Error at get_note method: {} {}'.format(status, note))
 
 
 def delete_note(number_or_alias):
@@ -177,7 +176,7 @@ def delete_note(number_or_alias):
         return "Note deleted"
     elif status == 404:
         return "No note with requested alias"
-    raise Exception('Error at delete_note method: {0} {1}'.format(status, number_or_alias))
+    raise Exception(u'Error at delete_note method: {0} {1}'.format(status, number_or_alias))
 
 
 def get_last_note():
@@ -199,7 +198,7 @@ def create_note(note, alias=None, notebook=None):
         return 'Saved'
     elif status in [406, 409]:
         return json.loads(responce)['error']
-    raise Exception('Error at create_note method: {0} {1}'.format(status, responce))
+    raise Exception(u'Error at create_note method: {0} {1}'.format(status, responce))
 
 
 def report(tb):
@@ -229,7 +228,7 @@ def drop_tokens():
     _, status = do_request(_URLS_MAP['drop_tokens'], method=POST)
     if status in _SUCCESS:
         return 'Tokens are deleted'
-    raise Exception('Error at drop_token method: {0} {1}'.format(status, _))
+    raise Exception(u'Error at drop_token method: {0} {1}'.format(status, _))
 
 
 def _get_token():
@@ -239,14 +238,14 @@ def _get_token():
         return json.loads(token)['token']
     else:
         if get_options().report:
-            report('Error at token getting {0} ({1})'.format(token, status))
+            report(u'Error at token getting {0} ({1})'.format(token, status))
         else:
             sys.stderr.write('Can not get token, to report problem run with --report option\n')
 
 
 def registration(question_location):
     """Asks user for answer the question at given location and send result """
-    prompt = "If you are not registered yet, please answer the question '{0}': ".format(do_request(question_location)[0])
+    prompt = u"If you are not registered yet, please answer the question '{0}': ".format(do_request(question_location)[0])
     answer = _get_from_stdin(prompt)
     response, status = do_request(question_location, POST, {'answer': answer})
     if status in _SUCCESS:
