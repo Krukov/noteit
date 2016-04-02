@@ -107,13 +107,16 @@ def display(out, stdout=sys.stdout):
     stdout.write(out + '\n')
 
 
-def get_notes(notebook=None):
+def get_notes(all=False, notebook=None, quiet=False):
     """Return user's notes as string"""
     url = _URLS_MAP['get_notes']
+    data = None
     if notebook:
-        url = _URLS_MAP['get_notebook'].format(i=notebook)
+        data = {'notebook': notebook}
+    elif all:
+        data = {'all': True}
     try:
-        notes, status = do_request(url)
+        notes, status = do_request(url, data=data)
     except (ConnectionError, ServerError, gaierror):
         notes = _get_notes_from_cache(notebook)
         status = 200
@@ -127,12 +130,16 @@ def get_notes(notebook=None):
         out = ''
         for note in json.loads(notes):
             out += '>'
-            if not notebook and note['notebook']:
-                note['notebook'] = ('[' + note['notebook'] + ']')
-            else:
+            if quiet:
+                note['text'] = ''
                 note['notebook'] = ''
-            text = _decrypt_note(note['text'])
-            note['text'] = text[:_CROP] + ('...' if len(text) > _CROP else '')
+            else:
+                if not notebook and note.get('notebook', None):
+                    note['notebook'] = ('[' + note['notebook'] + '] ')
+                else:
+                    note['notebook'] = ''
+                text = _decrypt_note(note['text'])
+                note['text'] = text[:_CROP] + ('...' if len(text) > _CROP else '')
             out += _TEMPLATE.format(**note)
             out += '\n'
         return out[:-1]
@@ -553,6 +560,8 @@ def get_options_parser():
     parser.add_argument('-p', '--password', help='password')
     parser.add_argument('--host', help=argparse.SUPPRESS)
 
+    parser.add_argument('-q', '--quiet', help='only display aliases', action='store_true')
+    parser.add_argument('--all', help='display all notes', action='store_true')
     parser.add_argument('-l', '--last', help='display last note', action='store_true')
     parser.add_argument('-a', '--alias', help='set alias for note / display note with given alias')
     parser.add_argument('-n', '--notebook', help='set notebook for note / display notes with given notebook')
@@ -614,8 +623,8 @@ def main():
                 display(get_note(_format_alias(options.alias)))
         elif options.last:
             display(get_last_note())
-        elif not options.note:
-            display(get_notes(options.notebook))
+        else:
+            display(get_notes(all=options.all, notebook=options.notebook, quiet=options.quiet))
 
     except KeyboardInterrupt:
         sys.exit('\n')
