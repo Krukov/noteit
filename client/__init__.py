@@ -30,7 +30,7 @@ try:
         return base64.urlsafe_b64encode(message)
 
     def base64decode(message):
-        return base64.urlsafe_b64decode(message.encode())
+        return base64.urlsafe_b64decode(message.encode()).decode('utf-8')
 
 except ImportError:
     from http.client import HTTPConnection, HTTPSConnection  # Py>=3
@@ -46,7 +46,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.14.4'
+__VERSION__ = '0.17.0'
 
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 ALPHA = string.ascii_letters + string.digits + '=_-'
@@ -70,12 +70,18 @@ _URLS_MAP = {
     'drop_tokens': '/drop_tokens',
     'get_token': '/get_token',
     'get_notes': '/notes',
-    'get_note': '/notes/{i}',
+    'get_notebook': u'/notebook/{i}',
+    'get_note': u'/notes/{i}',
     'report': '/report',
 }
 _SUCCESS = range(200, 206)
-_TEMPLATE = '{alias}: {text}'
-_CROP = 78
+
+_DECRYPT_ERROR_MSG = "'Error - can't decrypt note"
+_TEMPLATE = u' {alias:^20} {text:<80}'
+_TEMPLATE_N = u' {notebook:^12} {alias:^13} {text:<80}'
+_TEMPLATE_NA = u' {notebook:^20} {alias:^13}'
+_TEMPLATE_A = u'✓ {alias}'
+_CROP = 77
 
 
 class AuthenticationError(Exception):
@@ -106,12 +112,21 @@ def display(out, stdout=sys.stdout):
     stdout.write(out + '\n')
 
 
-def get_notes():
+def get_notes(all=False, notebook=None, quiet=False):
     """Return user's notes as string"""
+    url = _URLS_MAP['get_notes']
+    template = _TEMPLATE if not quiet else _TEMPLATE_A
+    data = None
+    if notebook:
+        data = {'notebook': notebook}
+    elif all:
+        template = _TEMPLATE_N if not quiet else _TEMPLATE_NA
+        data = {'all': True}
+
     try:
-        notes, status = do_request(_URLS_MAP['get_notes'])
+        notes, status = do_request(url, data=data)
     except (ConnectionError, ServerError, gaierror):
-        notes = _get_notes_from_cache()
+        notes = _get_notes_from_cache(notebook)
         status = 200
         if notes is None:
             raise
@@ -119,14 +134,21 @@ def get_notes():
             status = 204
 
     if status == 200:
-        _cache_notes(notes)
-        return '>' + '\n>'.join(
-            _TEMPLATE.format(alias=n['alias'], text=(lambda s: s[:_CROP] + ('...' if len(s) > _CROP else ''))(  _decrypt_note(n['text'])))
-                                for n in json.loads(notes)
-        )
+        _cache_notes(notes, notebook)
+        out = template.replace(u'<', u'^').format(text='NOTE', alias='ALIAS', notebook='NOTEBOOK') + '\n' * 2
+        out = '' if quiet else out
+        for note in json.loads(notes):
+            text = _decrypt_note(note['text']).replace(u'\n', u' ')
+            note['text'] = text[:_CROP] + (u'...' if len(text) > _CROP else'')
+            note['notebook'] = note.get('notebook') or ''
+            out += template.format(**note)
+            out += '\n'
+        return out[:-1]
     elif status == 204:
+        if notebook:
+            return "You do not have notes in the '{0}' notebook".format(notebook)
         return "You do not have notes"
-    raise Exception('Error at get_notes method: {} {}'.format(status, notes))
+    raise Exception('Error at get_notes method: {0} {1}'.format(status, notes))
 
 
 def get_note(number_or_alias):
@@ -142,10 +164,17 @@ def get_note(number_or_alias):
             status = 204
 
     if status in _SUCCESS:
-        return _decrypt_note(json.loads(note)['text'])
+    	note = json.loads(note)['text']
+        result = _decrypt_note(note)
+    	if result.startswith(_DECRYPT_ERROR_MSG):
+    		try:
+    			result = _decrypt(note, _get_key_from_stdin())
+    		except:
+    			pass
+    	return result
     elif status == 404:
         return "No note with requested alias"
-    raise Exception('Error at get_note method: {} {}'.format(status, note))
+    raise Exception(u'Error at get_note method: {} {}'.format(status, note))
 
 
 def delete_note(number_or_alias):
@@ -156,7 +185,7 @@ def delete_note(number_or_alias):
         return "Note deleted"
     elif status == 404:
         return "No note with requested alias"
-    raise Exception('Error at delete_note method: {} {}'.format(status, number_or_alias))
+    raise Exception(u'Error at delete_note method: {0} {1}'.format(status, number_or_alias))
 
 
 def get_last_note():
@@ -166,17 +195,19 @@ def get_last_note():
         return _decrypt_note(json.loads(notes)[0]['text'])
 
 
-def create_note(note, alias=None):
+def create_note(note, alias=None, notebook=None):
     """Make request for saving note"""
     data = {'text': _encrypt_note(note)}
     if alias:
         data['alias'] = alias
+    if notebook:
+        data['_notebook'] = notebook
     responce, status = do_request(_URLS_MAP['get_notes'], method=POST, data=data)
     if status in _SUCCESS:
         return 'Saved'
     elif status in [406, 409]:
         return json.loads(responce)['error']
-    raise Exception('Error at create_note method: {} {}'.format(status, responce))
+    raise Exception(u'Error at create_note method: {0} {1}'.format(status, responce))
 
 
 def report(tb):
@@ -206,7 +237,7 @@ def drop_tokens():
     _, status = do_request(_URLS_MAP['drop_tokens'], method=POST)
     if status in _SUCCESS:
         return 'Tokens are deleted'
-    raise Exception('Error at drop_token method: {} {}'.format(status, _))
+    raise Exception(u'Error at drop_token method: {0} {1}'.format(status, _))
 
 
 def _get_token():
@@ -216,14 +247,14 @@ def _get_token():
         return json.loads(token)['token']
     else:
         if get_options().report:
-            report('Error at token getting %s (%s)' % (token, status))
+            report(u'Error at token getting {0} ({1})'.format(token, status))
         else:
             sys.stderr.write('Can not get token, to report problem run with --report option\n')
 
 
 def registration(question_location):
     """Asks user for answer the question at given location and send result """
-    prompt = "If you are not registered yet, please answer the question '{0}': ".format(do_request(question_location)[0])
+    prompt = u"If you are not registered yet, please answer the question '{0}': ".format(do_request(question_location)[0])
     answer = _get_from_stdin(prompt)
     response, status = do_request(question_location, POST, {'answer': answer})
     if status in _SUCCESS:
@@ -328,16 +359,17 @@ def _get_user():
     return get_options().user or _get_from_stdin('Input username: ')
 
 
+def _get_key_from_stdin():
+    return getpass.getpass('Input encryption key: ')
+
+
 @cached_function
 def _get_key():
     """Return key to encode/decode from argument or from local"""
     key = get_options().key
     if key:
-        if not os.path.isfile(key):
-            return key
-        with open(key) as key_file:
-            return key_file.read()
-
+        return _get_key_from_stdin
+     
     if not get_options().user and os.path.isfile(_KEY_PATH):
         with open(_KEY_PATH) as key_file:
             return key_file.read()
@@ -446,15 +478,21 @@ def _is_debug():
     return '--debug' in sys.argv
 
 
-def _cache_notes(notes):
+def _cache_notes(notes, notebook):
     """Save notes in local file"""
-    _save_file_or_ignore(_CACHE_PATH, notes)
+    path = _CACHE_PATH
+    if notebook:
+        path += '.' + notebook
+    _save_file_or_ignore(path, notes)
 
 
-def _get_notes_from_cache():
-    if not os.path.isfile(_CACHE_PATH):
+def _get_notes_from_cache(notebook):
+    path = _CACHE_PATH
+    if notebook:
+        path += '.' + notebook
+    if not os.path.isfile(path):
         return
-    with open(_CACHE_PATH) as _file:
+    with open(path) as _file:
         return _file.read()
 
 
@@ -512,8 +550,8 @@ def _decrypt_note(note):
         return note
     try:
         return _decrypt(note, _get_key())
-    except (UnicodeDecodeError, TypeError, AsciiError, ValueError):
-        return 'Error - can not decrypt note: {0}'.format(note)
+    except (UnicodeDecodeError, TypeError, AsciiError, ValueError, AttributeError):
+        return '{0}: {1}'.format(_DECRYPT_ERROR_MSG, note)
 
 
 def get_options_parser():
@@ -531,8 +569,12 @@ def get_options_parser():
     parser.add_argument('-p', '--password', help='password')
     parser.add_argument('--host', help=argparse.SUPPRESS)
 
+    parser.add_argument('-q', '--quiet', help='only display aliases', action='store_true')
+    parser.add_argument('--all', help='display all notes', action='store_true')
     parser.add_argument('-l', '--last', help='display last note', action='store_true')
     parser.add_argument('-a', '--alias', help='set alias for note / display note with given alias')
+    parser.add_argument('-n', '--notebook', help='set notebook for note / display notes with given notebook')
+
     parser.add_argument('-d', '--delete', help='delete note', action='store_true')
     parser.add_argument('-o', '--overwrite', help='overwrite note', action='store_true')
 
@@ -546,7 +588,8 @@ def get_options_parser():
                         action='store_true')
     parser.add_argument('--do-not-encrypt', help='disable encrypting/decrypting notes',
                         action='store_true')
-    parser.add_argument('-k', '--key', help='key to encrypting/decrypting notes (default is password base)')
+    parser.add_argument('-k', '--key', help='key to encrypting/decrypting notes (default is password base)',
+                        action='store_true')
 
     parser.add_argument('--anon', help='do not add OS and other info to user-agent header',
                         action='store_true')
@@ -581,17 +624,17 @@ def main():
                     delete_note(_format_alias(alias))
                 except:
                     pass
-            display(create_note(note, alias))
+            display(create_note(note, alias, options.notebook))
 
-        elif options.alias:
+        elif options.alias is not None:
             if options.delete:
                 display(delete_note(_format_alias(options.alias)))
             else:
                 display(get_note(_format_alias(options.alias)))
         elif options.last:
             display(get_last_note())
-        elif not options.note:
-            display(get_notes())
+        else:
+            display(get_notes(all=options.all, notebook=options.notebook, quiet=options.quiet))
 
     except KeyboardInterrupt:
         sys.exit('\n')
@@ -608,7 +651,7 @@ def main():
             sys.exit('Something went wrong! You can sent report to us with "-r" option')
         report(traceback.format_exc())
 
-    if options.user or (not options.do_not_save and not _get_token_from_system() and not options.drop_tokens):
+    if not options.do_not_save and (options.user or (not _get_token_from_system() and not options.drop_tokens)):
         token = _get_token()
         if token:
             _save_token(token)
