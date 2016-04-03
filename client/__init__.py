@@ -46,7 +46,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.17.0'
+__VERSION__ = '0.17.1'
 
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 ALPHA = string.ascii_letters + string.digits + '=_-'
@@ -164,14 +164,14 @@ def get_note(number_or_alias):
             status = 204
 
     if status in _SUCCESS:
-    	note = json.loads(note)['text']
+        note = json.loads(note)['text']
         result = _decrypt_note(note)
-    	if result.startswith(_DECRYPT_ERROR_MSG):
-    		try:
-    			result = _decrypt(note, _get_key_from_stdin())
-    		except:
-    			pass
-    	return result
+        if result.startswith(_DECRYPT_ERROR_MSG):
+            try:
+                result = _decrypt(note, _get_key_from_stdin())
+            except:
+                pass
+        return result
     elif status == 404:
         return "No note with requested alias"
     raise Exception(u'Error at get_note method: {} {}'.format(status, note))
