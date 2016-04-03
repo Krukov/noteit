@@ -75,6 +75,8 @@ _URLS_MAP = {
     'report': '/report',
 }
 _SUCCESS = range(200, 206)
+
+_DECRYPT_ERROR_MSG = "'Error - can't decrypt note"
 _TEMPLATE = u' {alias:^20} {text:<80}'
 _TEMPLATE_N = u' {notebook:^12} {alias:^13} {text:<80}'
 _TEMPLATE_NA = u' {notebook:^20} {alias:^13}'
@@ -162,7 +164,14 @@ def get_note(number_or_alias):
             status = 204
 
     if status in _SUCCESS:
-        return _decrypt_note(json.loads(note)['text'])
+    	note = json.loads(note)['text']
+        result = _decrypt_note(note)
+    	if result.startswith(_DECRYPT_ERROR_MSG):
+    		try:
+    			result = _decrypt(note, _get_key_from_stdin())
+    		except:
+    			pass
+    	return result
     elif status == 404:
         return "No note with requested alias"
     raise Exception(u'Error at get_note method: {} {}'.format(status, note))
@@ -350,16 +359,17 @@ def _get_user():
     return get_options().user or _get_from_stdin('Input username: ')
 
 
+def _get_key_from_stdin():
+    return getpass.getpass('Input encryption key: ')
+
+
 @cached_function
 def _get_key():
     """Return key to encode/decode from argument or from local"""
     key = get_options().key
     if key:
-        if not os.path.isfile(key):
-            return key
-        with open(key) as key_file:
-            return key_file.read()
-
+        return _get_key_from_stdin
+     
     if not get_options().user and os.path.isfile(_KEY_PATH):
         with open(_KEY_PATH) as key_file:
             return key_file.read()
@@ -541,7 +551,7 @@ def _decrypt_note(note):
     try:
         return _decrypt(note, _get_key())
     except (UnicodeDecodeError, TypeError, AsciiError, ValueError, AttributeError):
-        return 'Error - can not decrypt note: {0}'.format(note)
+        return '{0}: {1}'.format(_DECRYPT_ERROR_MSG, note)
 
 
 def get_options_parser():
@@ -578,7 +588,8 @@ def get_options_parser():
                         action='store_true')
     parser.add_argument('--do-not-encrypt', help='disable encrypting/decrypting notes',
                         action='store_true')
-    parser.add_argument('-k', '--key', help='key to encrypting/decrypting notes (default is password base)')
+    parser.add_argument('-k', '--key', help='key to encrypting/decrypting notes (default is password base)',
+                        action='store_true')
 
     parser.add_argument('--anon', help='do not add OS and other info to user-agent header',
                         action='store_true')
