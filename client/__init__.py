@@ -46,7 +46,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.17.1'
+__VERSION__ = '0.17.2'
 
 GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
 ALPHA = string.ascii_letters + string.digits + '=_-'
@@ -368,7 +368,7 @@ def _get_key():
     """Return key to encode/decode from argument or from local"""
     key = get_options().key
     if key:
-        return _get_key_from_stdin
+        return _get_key_from_stdin()
      
     if not get_options().user and os.path.isfile(_KEY_PATH):
         with open(_KEY_PATH) as key_file:
