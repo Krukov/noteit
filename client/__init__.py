@@ -76,7 +76,7 @@ _URLS_MAP = {
 }
 _SUCCESS = range(200, 206)
 
-_DECRYPT_ERROR_MSG = "'Error - can't decrypt note"
+_DECRYPT_ERROR_MSG = u"Error - can't decrypt note"
 _TEMPLATE = u' {alias:^20} {text:<80}'
 _TEMPLATE_N = u' {notebook:^12} {alias:^13} {text:<80}'
 _TEMPLATE_NA = u' {notebook:^20} {alias:^13}'
@@ -92,6 +92,10 @@ class AuthenticationError(Exception):
 class ServerError(Exception):
     """Error if server is return 50x status"""
     pass
+
+
+class DecryptError(Exception):
+    """Error if can't decrypt note"""
 
 
 def cached_function(func):
@@ -136,19 +140,22 @@ def get_notes(all=False, notebook=None, quiet=False):
     if status == 200:
         _cache_notes(notes, notebook)
         out = template.replace(u'<', u'^').format(text='NOTE', alias='ALIAS', notebook='NOTEBOOK') + '\n' * 2
-        out = '' if quiet else out
+        out = '' if quiet and not all else out
         for note in json.loads(notes):
-            text = _decrypt_note(note['text']).replace(u'\n', u' ')
-            note['text'] = text[:_CROP] + (u'...' if len(text) > _CROP else'')
+            try:
+                text = _decrypt_note(note['text'])
+            except DecryptError:
+                text = u'{0}: {1}'.format(_DECRYPT_ERROR_MSG, note['text'])
+            note['text'] = (text[:_CROP] + (u'...' if len(text) > _CROP or u'\n' in text else'')).replace(u'\n', u' ')
             note['notebook'] = note.get('notebook') or ''
             out += template.format(**note)
             out += '\n'
         return out[:-1]
     elif status == 204:
         if notebook:
-            return "You do not have notes in the '{0}' notebook".format(notebook)
-        return "You do not have notes"
-    raise Exception('Error at get_notes method: {0} {1}'.format(status, notes))
+            return u"You do not have notes in the '{0}' notebook".format(notebook)
+        return u"You do not have notes"
+    raise Exception(u'Error at get_notes method: {0} {1}'.format(status, notes))
 
 
 def get_note(number_or_alias):
@@ -165,15 +172,16 @@ def get_note(number_or_alias):
 
     if status in _SUCCESS:
         note = json.loads(note)['text']
-        result = _decrypt_note(note)
-        if result.startswith(_DECRYPT_ERROR_MSG):
+        try:
+            result = _decrypt_note(note)
+        except DecryptError:
             try:
                 result = _decrypt(note, _get_key_from_stdin('decryption'))
-            except:
-                pass
+            except: 
+                result = _DECRYPT_ERROR_MSG
         return result
     elif status == 404:
-        return "No note with requested alias"
+        return u"No note with requested alias"
     raise Exception(u'Error at get_note method: {} {}'.format(status, note))
 
 
@@ -182,9 +190,9 @@ def delete_note(number_or_alias):
     url = _URLS_MAP['get_note'].format(i=number_or_alias)
     _, status = do_request(url, method=DELETE)
     if status in _SUCCESS:
-        return "Note deleted"
+        return u"Note deleted"
     elif status == 404:
-        return "No note with requested alias"
+        return u"No note with requested alias"
     raise Exception(u'Error at delete_note method: {0} {1}'.format(status, number_or_alias))
 
 
@@ -227,16 +235,16 @@ def report(tb):
         status = conn.getresponse().status
 
     if status in _SUCCESS:
-        display('Thank you for reporting...')
+        display(u'Thank you for reporting...')
     else:
-        display('Error: can not be reported')
+        display(u'Error: can not be reported')
 
 
 def drop_tokens():
     """Make request to recreate user's tokens"""
     _, status = do_request(_URLS_MAP['drop_tokens'], method=POST)
     if status in _SUCCESS:
-        return 'Tokens are deleted'
+        return u'Tokens are deleted'
     raise Exception(u'Error at drop_token method: {0} {1}'.format(status, _))
 
 
@@ -249,7 +257,7 @@ def _get_token():
         if get_options().report:
             report(u'Error at token getting {0} ({1})'.format(token, status))
         else:
-            sys.stderr.write('Can not get token, to report problem run with --report option\n')
+            sys.stderr.write(u'Can not get token, to report problem run with --report option\n')
 
 
 def registration(question_location):
@@ -350,17 +358,17 @@ def _get_host():
 @cached_function
 def _get_password():
     """Return password from argument or asks user for it"""
-    return get_options().password or getpass.getpass('Input your password: ')
+    return get_options().password or getpass.getpass(u'Input your password: ')
 
 
 @cached_function
 def _get_user():
     """Return user from argument or asks user for it"""
-    return get_options().user or _get_from_stdin('Input username: ')
+    return get_options().user or _get_from_stdin(u'Input username: ')
 
 
 def _get_key_from_stdin(type='encryption'):
-    return getpass.getpass('Input {0} key: '.format(type))
+    return getpass.getpass(u'Input {0} key: '.format(type))
 
 
 @cached_function
@@ -408,9 +416,9 @@ def _get_user_agent():
 def _generate_user_agent_with_info():
     """Generete User-Agent with environment info"""
     return ' '.join([
-        '{0}/{1}'.format('Noteit', get_version()),
-        '{i[0]}-{i[1]}/{i[2]}-{i[5]}'.format(i=platform.uname()),
-        '{0}/{1}'.format(platform.python_implementation(), platform.python_version()),
+        u'{0}/{1}'.format('Noteit', get_version()),
+        u'{i[0]}-{i[1]}/{i[2]}-{i[5]}'.format(i=platform.uname()),
+        u'{0}/{1}'.format(platform.python_implementation(), platform.python_version()),
     ])
 
 
@@ -551,7 +559,7 @@ def _decrypt_note(note):
     try:
         return _decrypt(note, _get_key())
     except (UnicodeDecodeError, TypeError, AsciiError, ValueError, AttributeError):
-        return '{0}: {1}'.format(_DECRYPT_ERROR_MSG, note)
+        raise DecryptError
 
 
 def get_options_parser():
@@ -639,16 +647,16 @@ def main():
     except KeyboardInterrupt:
         sys.exit('\n')
     except AuthenticationError:
-        sys.exit('Error in authentication. Username maybe occupied')
+        sys.exit(u'Error in authentication. Username maybe occupied')
     except ServerError:
-        sys.exit('Sorry there is server error. Please, try again later')
+        sys.exit(u'Sorry there is server error. Please, try again later')
     except (ConnectionError, gaierror):
-        sys.exit('Something wrong with connection, check your internet connection or try again later')
+        sys.exit(u'Something wrong with connection, check your internet connection or try again later')
     except Exception:
         if _is_debug():
             raise
         if not options.report:
-            sys.exit('Something went wrong! You can sent report to us with "-r" option')
+            sys.exit(u'Something went wrong! You can sent report to us with "-r" option')
         report(traceback.format_exc())
 
     if not options.do_not_save and (options.user or (not _get_token_from_system() and not options.drop_tokens)):
