@@ -74,34 +74,41 @@ How to use
 ::
 
 	$ /# noteit 
-	>Input username: krukov
-	>Input your password: 
+	>Input username: newUser
+	>Input your password: ****
 	>You do not have notes
 	$ /# noteit My first note
 	>Saved
-	$ /# echo "Noteit can get note from pipe" | noteit
+	$ /# echo "Noteit can get note from pipe" | noteit -a print_pipe
 	>Saved
 	$ /# noteit 
-	>rsf: Noteit can get note from pipe
-	>temme: My first note
+	>        ALIAS                     NOTE
+	>
+	> print_pipe      Noteit can get note from pipe
+	>  suscipit       My first note
 	$ /# noteit echo "You can run it"
 	>Saved
 	$ /# noteit -l | sh
 	You can run it
-	$ /# noteit Create note with alias -a alias
+	$ /# noteit Create note with alias and in notebook -a alias -n mynotebook
 	>Saved
-	$ /# noteit
-	>alias: Create note with alias
-	>rsf: Noteit can get note from pipe
-	>temme: My first note
+	$ /# noteit --all
+	>   NOTEBOOK       ALIAS                               NOTE
+	>
+	> mynotebook      alias     Create note with alias and in notebook
+	>              print_pipe   Noteit can get note from pipe
+	>               suscipit    My first note
 	$ /# noteit -a alias
-	Create note with alias
-
+	>Create note with alias
+	$ /# noteit Super secret note -a ss --key
+	>Input encryption key: *****
+	>Saved
 
 
 *FUTURE*
 ==========
  - https!!!
- - notebooks (collections of notes)
  - colorize
- - save files DONATE?
+ - share note with user
+ - search
+ - note with file DONATE?
