@@ -168,7 +168,7 @@ def get_note(number_or_alias):
         result = _decrypt_note(note)
         if result.startswith(_DECRYPT_ERROR_MSG):
             try:
-                result = _decrypt(note, _get_key_from_stdin())
+                result = _decrypt(note, _get_key_from_stdin('decryption'))
             except:
                 pass
         return result
@@ -359,8 +359,8 @@ def _get_user():
     return get_options().user or _get_from_stdin('Input username: ')
 
 
-def _get_key_from_stdin():
-    return getpass.getpass('Input encryption key: ')
+def _get_key_from_stdin(type='encryption'):
+    return getpass.getpass('Input {0} key: '.format(type))
 
 
 @cached_function
