@@ -177,17 +177,19 @@ def get_note(number_or_alias):
         except DecryptError:
             try:
                 result = _decrypt(note, _get_key_from_stdin('decryption'))
-            except: 
+            except:
                 result = _DECRYPT_ERROR_MSG
         return result
     elif status == 404:
         return u"No note with requested alias"
-    raise Exception(u'Error at get_note method: {} {}'.format(status, note))
+    raise Exception(u'Error at get_note method: {0} {1}'.format(status, note))
 
 
 def delete_note(number_or_alias):
     """Delete/remove user note of given number (number in [1..5]) or alias"""
     url = _URLS_MAP['get_note'].format(i=number_or_alias)
+    if input(u'Are you really want to delete note with alias "{0}"? '.format(number_or_alias)) not in [u'yes', u'y']:
+        return u'Canceled'
     _, status = do_request(url, method=DELETE)
     if status in _SUCCESS:
         return u"Note deleted"
