@@ -59,21 +59,8 @@ _TOKEN_PATH = os.path.join(_PATH, 'noteit.tkn')
 _KEY_PATH = os.path.join(_PATH, 'enc')
 _CACHE_PATH = os.path.join(_PATH, '_notes')
 
-_TOKEN_ENV_VALUE = 'NOTEIT_TOKEN'
-_CONF_LINK = 'https://raw.githubusercontent.com/Krukov/noteit/stable/.conf.json'
 _USER_AGENT_HEADER = 'User-Agent'
 _CONTENT_TYPE_HEADER = 'Content-type'
-_AUTH_HEADER = 'Authorization'
-_TOKEN_HEADER = 'Authorization'
-_URLS_MAP = {
-    'create_note': '/notes',
-    'drop_tokens': '/drop_tokens',
-    'get_token': '/get_token',
-    'get_notes': '/notes',
-    'get_notebook': u'/notebook/{i}',
-    'get_note': u'/notes/{i}',
-    'report': '/report',
-}
 _SUCCESS = range(200, 206)
 
 _DECRYPT_ERROR_MSG = u"Error - can't decrypt note"
@@ -242,26 +229,6 @@ def report(tb):
         display(u'Error: can not be reported')
 
 
-def drop_tokens():
-    """Make request to recreate user's tokens"""
-    _, status = do_request(_URLS_MAP['drop_tokens'], method=POST)
-    if status in _SUCCESS:
-        return u'Tokens are deleted'
-    raise Exception(u'Error at drop_token method: {0} {1}'.format(status, _))
-
-
-def _get_token():
-    """Send request to get token and return it at success"""
-    token, status = do_request(_URLS_MAP['get_token'], method=POST)
-    if status in _SUCCESS:
-        return json.loads(token)['token']
-    else:
-        if get_options().report:
-            report(u'Error at token getting {0} ({1})'.format(token, status))
-        else:
-            sys.stderr.write(u'Can not get token, to report problem run with --report option\n')
-
-
 def registration(question_location):
     """Asks user for answer the question at given location and send result """
     prompt = u"If you are not registered yet, please answer the question '{0}': ".format(do_request(question_location)[0])
@@ -302,8 +269,6 @@ def _response_handler(response):
     elif response.status > 500:
         raise ServerError
     elif response.status in [301, 302, 303, 307] and response._method != POST:
-        if registration(response.getheader('Location')):
-            return retry(response)
         raise AuthenticationError
     return response_body, response.status
 
@@ -337,24 +302,6 @@ def _make_request(url, method=GET, data=None, headers=None):
     conn.request(method, url, body=data, headers=headers)
 
     return conn.getresponse()
-
-
-@cached_function
-def _get_host():
-    """Return noteit backend host"""
-    host = get_options().host or os.environ.get('NOTEIT_HOST')
-    if not host:
-        #  Get host from .conf file from repo
-        conn = HTTPSConnection(_CONF_LINK.split('/', 3)[2])
-        conn.request(GET, _CONF_LINK)
-        request = conn.getresponse()
-        conf_from_git = request.read().decode('ascii')
-        host = json.loads(conf_from_git)['host']
-        if host.endswith('/'):
-            host = host[:-1]
-    if not os.environ.get('NOTEIT_HOST'):
-        os.environ['NOTEIT_HOST'] = host
-    return host
 
 
 @cached_function
@@ -420,31 +367,7 @@ def _generate_user_agent_with_info():
     return ' '.join([
         u'{0}/{1}'.format('Noteit', get_version()),
         u'{i[0]}-{i[1]}/{i[2]}-{i[5]}'.format(i=platform.uname()),
-        u'{0}/{1}'.format(platform.python_implementation(), platform.python_version()),
     ])
-
-
-@cached_function
-def _get_token_from_system():
-    """Return token from file"""
-    if _TOKEN_ENV_VALUE in os.environ:
-        return os.environ.get(_TOKEN_ENV_VALUE)
-    if get_options().token:
-        return get_options().token
-    if os.path.isfile(_TOKEN_PATH):
-        with open(_TOKEN_PATH) as _file:
-            return _file.read().strip()
-
-
-def _save_token(token):
-    """Save token to file"""
-    _save_file_or_ignore(_TOKEN_PATH, token)
-
-
-def _delete_token():
-    """Delete file with token"""
-    if os.path.exists(_TOKEN_PATH):
-        os.remove(_TOKEN_PATH)
 
 
 @cached_function
@@ -577,7 +500,6 @@ def get_options_parser():
 
     parser.add_argument('-u', '--user', help='username')
     parser.add_argument('-p', '--password', help='password')
-    parser.add_argument('--host', help=argparse.SUPPRESS)
 
     parser.add_argument('-q', '--quiet', help='only display aliases', action='store_true')
     parser.add_argument('--all', help='display all notes', action='store_true')
@@ -586,15 +508,8 @@ def get_options_parser():
     parser.add_argument('-n', '--notebook', help='set notebook for note / display notes with given notebook')
 
     parser.add_argument('-d', '--delete', help='delete note', action='store_true')
-    parser.add_argument('-o', '--overwrite', help='overwrite note', action='store_true')
-
-    parser.add_argument('--drop-tokens', help='make all you tokens invalid',
-                        action='store_true')
-    parser.add_argument('--token', help='for manual setting token')
 
     parser.add_argument('--do-not-save', help='disable savings any data locally',
-                        action='store_true')
-    parser.add_argument('-i', '--ignore', help='if set, tool will ignore local token',
                         action='store_true')
     parser.add_argument('--do-not-encrypt', help='disable encrypting/decrypting notes',
                         action='store_true')
@@ -618,15 +533,7 @@ def main():
     """Main"""
     options = get_options()
     try:
-        if options.drop_tokens:
-            try:
-                display(drop_tokens())
-            except (AuthenticationError, ServerError, ConnectionError):
-                pass
-            if os.path.isfile(_TOKEN_PATH):
-                _delete_token()
-
-        elif options.note:
+        if options.note:
             note = ' '.join(options.note) if isinstance(options.note, (list, tuple)) else options.note
             alias = options.alias
             if options.overwrite:
@@ -660,11 +567,6 @@ def main():
         if not options.report:
             sys.exit(u'Something went wrong! You can sent report to us with "-r" option')
         report(traceback.format_exc())
-
-    if not options.do_not_save and (options.user or (not _get_token_from_system() and not options.drop_tokens)):
-        token = _get_token()
-        if token:
-            _save_token(token)
 
 
 if __name__ == '__main__':
