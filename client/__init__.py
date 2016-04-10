@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import argparse
 import base64
@@ -12,14 +12,18 @@ import hashlib
 import select
 import string
 import sys
+import time
 import traceback
+from datetime import datetime
 from itertools import cycle
 from socket import gaierror
 from binascii import Error as AsciiError
 
 try:
-    from httplib import HTTPConnection, HTTPSConnection  # Py<3
+    # Python 2
+    from httplib import HTTPConnection, HTTPSConnection
     from urllib import urlencode, quote
+    from urlparse import urlparse
     from socket import error as ConnectionError
     input = raw_input
 
@@ -33,8 +37,9 @@ try:
         return base64.urlsafe_b64decode(message.encode()).decode('utf-8')
 
 except ImportError:
-    from http.client import HTTPConnection, HTTPSConnection  # Py>=3
-    from urllib.parse import urlencode, quote
+    # Python 3
+    from http.client import HTTPConnection, HTTPSConnection
+    from urllib.parse import urlencode, quote, urlparse
 
     def base64encode(message):
         return base64.urlsafe_b64encode(message.encode()).decode()
@@ -48,27 +53,46 @@ _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
 __VERSION__ = '0.17.2'
 
-GET, POST, PUT, DELETE = 'GET', 'POST', 'PUT', 'DELETE'
-ALPHA = string.ascii_letters + string.digits + '=_-'
+ALPHA = string.ascii_letters + string.digits + '=_-'  # never change it
 
-_TIMEOUT = 5
-_ANONYMOUS_USER_AGENT = 'anonymous'
-_HOST_ENV_VALUE = 'NOTEIT_HOST'
 _PATH = os.path.expanduser('~/.noteit/')
 _TOKEN_PATH = os.path.join(_PATH, 'noteit.tkn')
-_KEY_PATH = os.path.join(_PATH, 'enc')
-_CACHE_PATH = os.path.join(_PATH, '_notes')
+_CACHE_PATH = os.path.join(_PATH, '.cache')
+_TOKEN_ENV_VALUE = 'GIST_TOKEN'
 
+GET, POST, PUT, PATCH, DELETE = 'GET', 'POST', 'PUT', 'PATCH', 'DELETE'
 _USER_AGENT_HEADER = 'User-Agent'
+_ACCEPT_HEADER = 'Accept'
+_APPLICATION_JSON = 'application/json'
+_AUTH_HEADER = 'Authorization'
+_TOKEN_HEADER = 'Authorization'
 _CONTENT_TYPE_HEADER = 'Content-type'
 _SUCCESS = range(200, 206)
+_API_URL = 'https://api.github.com{path}'
+_SCOPE = 'gist'
+_TIMEOUT = 10
+_ANONYMOUS_USER_AGENT = 'anonymous'
+_URL_MAP = {
+    'gists': '/gists/{id}',
+    'user_gists': '/users/{user}/gists/{id}',
+    'token': '/authorizations/{id}',
+}
+
+_REPORT_GIST = 'noteit.report'
+_GIST_NAME_PREFIX = 'noteit'
+_GIST_FILENAME = '{alias}.{type}'
+_REPORT_TOKEN = 'f43cee85b9196c83512f0055e503268ab671dd2b'
+_TYPES = _TEXT_TYPE, _FILE_TYPE, _ENCRYPT_TYPE = ['text', 'file', 'entext']
 
 _DECRYPT_ERROR_MSG = u"Error - can't decrypt note"
-_TEMPLATE = u' {alias:^20} {text:<80}'
-_TEMPLATE_N = u' {notebook:^12} {alias:^13} {text:<80}'
-_TEMPLATE_NA = u' {notebook:^20} {alias:^13}'
-_TEMPLATE_A = u'✓ {alias}'
-_CROP = 77
+_TEMPLATE = u' {alias:^20} {updated:^20} {public:^6}'
+_TEMPLATE_N = u' {notebook:^12} ' + _TEMPLATE
+_TRUE = u'\u2713'
+_YES = [u'yes', u'y', u'poehali']
+_FORMAT = _DATE_FORMAT = '%d-%m-%y %H:%M'
+
+if sys.getdefaultencoding().lower() != 'utf-8':
+    _TRUE = '*'
 
 
 class AuthenticationError(Exception):
@@ -85,273 +109,403 @@ class DecryptError(Exception):
     """Error if can't decrypt note"""
 
 
+class NotFoundError(Exception):
+    """Error if can't decrypt note"""
+
+
 def cached_function(func):
     """Decorator that cache function result at first call and return cached result other calls """
 
     def _func(*args, **kwargs):
         force = kwargs.pop(_PASS_CACHE_KWARG, False)
-        if not hasattr(func, _CACHED_ATTR) or force or _is_debug():
+        _cache_name = _CACHED_ATTR + _md5(json.dumps({'k': kwargs, 'a': args}))
+        if not hasattr(func, _cache_name) or force or _is_debug():
             result = func(*args, **kwargs)
             if result is not None:
-                setattr(func, _CACHED_ATTR, result)
+                setattr(func, _cache_name, result)
             return result
-        return getattr(func, _CACHED_ATTR)
+        return getattr(func, _cache_name)
     return _func
 
 
-def display(out, stdout=sys.stdout):
-    stdout.write(out + '\n')
-
-
-def get_notes(all=False, notebook=None, quiet=False):
+def get_notes(all=False, notebook=None, public=False):
     """Return user's notes as string"""
-    url = _URLS_MAP['get_notes']
-    template = _TEMPLATE if not quiet else _TEMPLATE_A
-    data = None
-    if notebook:
-        data = {'notebook': notebook}
-    elif all:
-        template = _TEMPLATE_N if not quiet else _TEMPLATE_NA
-        data = {'all': True}
+    template = _TEMPLATE
+    if all:
+        template = _TEMPLATE_N
 
-    try:
-        notes, status = do_request(url, data=data)
-    except (ConnectionError, ServerError, gaierror):
-        notes = _get_notes_from_cache(notebook)
-        status = 200
-        if notes is None:
-            raise
-        elif not notes:
-            status = 204
+    objects = get_gist_manager()
+    yield template.replace(u'<', u'^').format(alias='ALIAS', notebook='NOTEBOOK',
+                                              updated='UPDATED', public='PUBLIC')
 
-    if status == 200:
-        _cache_notes(notes, notebook)
-        out = template.replace(u'<', u'^').format(text='NOTE', alias='ALIAS', notebook='NOTEBOOK') + '\n' * 2
-        out = '' if quiet and not all else out
-        for note in json.loads(notes):
-            try:
-                text = _decrypt_note(note['text'])
-            except DecryptError:
-                text = u'{0}: {1}'.format(_DECRYPT_ERROR_MSG, note['text'])
-            note['text'] = (text[:_CROP] + (u'...' if len(text) > _CROP or u'\n' in text else'')).replace(u'\n', u' ')
-            note['notebook'] = note.get('notebook') or ''
-            out += template.format(**note)
-            out += '\n'
-        return out[:-1]
-    elif status == 204:
-        if notebook:
-            return u"You do not have notes in the '{0}' notebook".format(notebook)
-        return u"You do not have notes"
-    raise Exception(u'Error at get_notes method: {0} {1}'.format(status, notes))
+    for gist in objects.noteit_gists():
+        meta = gist.description.split('.')[1:]
+        _notebook, _rule = meta if len(meta) == 2 else (None, meta[0])
+        if not all:
+            if public and _rule != 'public':
+                continue
+            if _notebook != notebook:
+                continue
+        for _file in gist.files:
+            alias, _, updated = _parse_file_name(_file.name)
+            yield template.format(notebook=_notebook or '__main__',
+                                  alias=alias,
+                                  public=_TRUE if gist.public else '',
+                                  updated=updated.strftime(_FORMAT) if updated else 'unknown')
 
 
-def get_note(number_or_alias):
-    """Return user note of given number (number in [1..5]) or alias"""
-    try:
-        note, status = do_request(_URLS_MAP['get_note'].format(i=number_or_alias))
-    except (ConnectionError, ServerError, gaierror):
-        note = _get_note_from_cache(number_or_alias)
-        status = 200
-        if note is None:
-            raise
-        elif not note:
-            status = 204
-
-    if status in _SUCCESS:
-        note = json.loads(note)['text']
-        try:
-            result = _decrypt_note(note)
-        except DecryptError:
-            try:
-                result = _decrypt(note, _get_key_from_stdin('decryption'))
-            except:
-                result = _DECRYPT_ERROR_MSG
-        return result
-    elif status == 404:
-        return u"No note with requested alias"
-    raise Exception(u'Error at get_note method: {0} {1}'.format(status, note))
+def get_note(alias, notebook=None, public=False):
+    """Return user note of given alias"""
+    _f = _get_gistfile_with_alias(alias, notebook=notebook, public=public)
+    if _f is None:
+        raise NotFoundError('Note not found')
+    if _parse_file_name(_f.name)[1] == _ENCRYPT_TYPE or get_options().key:
+        return _decrypt(_f.full_content, _get_key())
+    return _f.full_content
 
 
-def delete_note(number_or_alias):
-    """Delete/remove user note of given number (number in [1..5]) or alias"""
-    url = _URLS_MAP['get_note'].format(i=number_or_alias)
-    if input(u'Are you really want to delete note with alias "{0}"? '.format(number_or_alias)) not in [u'yes', u'y']:
-        return u'Canceled'
-    _, status = do_request(url, method=DELETE)
-    if status in _SUCCESS:
-        return u"Note deleted"
-    elif status == 404:
-        return u"No note with requested alias"
-    raise Exception(u'Error at delete_note method: {0} {1}'.format(status, number_or_alias))
+def delete_note(alias, notebook=None, public=False):
+    """Delete/remove user note of given alias"""
+    _f = _get_gistfile_with_alias(alias, notebook=notebook, public=public)
+    if _f is None:
+        raise NotFoundError('Note not found')
+    return _f.delete()
 
 
-def get_last_note():
+def get_last_note(notebook=None, public=False):
     """Return last saved note"""
-    notes, status = do_request(_URLS_MAP['get_notes'])
-    if status in _SUCCESS:
-        return _decrypt_note(json.loads(notes)[0]['text'])
+    gist = _get_gist_by_name(_get_gist_name(notebook, public))
+    now = datetime.utcnow()
+    last_f = sorted(gist.files, key=lambda _f: _parse_file_name(_f.name)[-1] or now)
+    if not last_f:
+        raise NotFoundError('Note not found')
+    if _parse_file_name(last_f[0].name)[1] == _ENCRYPT_TYPE:
+        return _decrypt(last_f[0].full_content, _get_key())
+    return last_f[0].full_content
 
 
-def create_note(note, alias=None, notebook=None):
-    """Make request for saving note"""
-    data = {'text': _encrypt_note(note)}
-    if alias:
-        data['alias'] = alias
-    if notebook:
-        data['_notebook'] = notebook
-    responce, status = do_request(_URLS_MAP['get_notes'], method=POST, data=data)
-    if status in _SUCCESS:
-        return 'Saved'
-    elif status in [406, 409]:
-        return json.loads(responce)['error']
-    raise Exception(u'Error at create_note method: {0} {1}'.format(status, responce))
+def delete_notebook(notebook, public=False):
+    _g = _get_gist_by_name(_get_gist_name(notebook, public))
+    if _g is None:
+        raise NotFoundError('Notebook not found')
+    return _g.delete()
+
+
+def create_note(note, alias=None, notebook=None, public=False, type=_TEXT_TYPE):
+    """Make note"""
+    if type == _ENCRYPT_TYPE:
+        note = _encrypt(note, _get_key())
+    gist_name = _get_gist_name(notebook, public)
+    gist = _get_gist_by_name(gist_name)
+    if gist:
+        for _f in gist.files:
+            if _parse_file_name(_f.name)[0] != alias:
+                continue
+            overwrite = input('Note with given alias already exists, Do you wanna overwrite it? ') in _YES
+            if not overwrite:
+                return
+            _f.content = note
+            _f.rename(_get_name_for_file(alias, type))
+            _f.save()
+            return note
+    else:
+        gist = Gist(get_gist_manager(), public=public, description=gist_name)
+    gist.add_file(_get_name_for_file(alias, type), note)
+    gist.save()
+    return note
 
 
 def report(tb):
     """Make traceback and etc. to server"""
-    data = {'traceback': tb}
-    try:
-        _, status = do_request(_URLS_MAP['report'], method=POST, data=data)
-    except Exception:
-        data = urlencode(data).encode('ascii')
-        conn = _get_connection()
-        try:
-            headers = _get_headers()
-        except Exception:
-            headers = {}
-        headers.update({"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"})
-        conn.request(POST, _URLS_MAP['report'], body=data, headers=headers)
-        status = conn.getresponse().status
-
-    if status in _SUCCESS:
-        display(u'Thank you for reporting...')
-    else:
-        display(u'Error: can not be reported')
-
-
-def registration(question_location):
-    """Asks user for answer the question at given location and send result """
-    prompt = u"If you are not registered yet, please answer the question '{0}': ".format(do_request(question_location)[0])
-    answer = _get_from_stdin(prompt)
-    response, status = do_request(question_location, POST, {'answer': answer})
-    if status in _SUCCESS:
-        return True
-    return False
-
+    _g = Gist(manager=_get_spec_manager(), description=(get_options().user or 'unknown') + str(time.time()))
+    _g.public = False
+    _g.add_file('tb', tb)
+    _g.add_file('info', _gen_info())
+    _g.save()
 
 # END API METHODS
-
-@cached_function
-def get_version():
-    """Return version of client"""
-    return __VERSION__
+# GIST COMMUNICATION
 
 
-def do_request(path, *args, **kwargs):
+class GistManager:
+
+    def __init__(self, user=None, password=None, token=None):
+        self.__user, self.__password = user, password
+        self.__token = token
+
+    @staticmethod
+    def _build_url(name, **kwargs):
+        kwargs.setdefault('id', '')
+        url = _URL_MAP[name].format(**kwargs)
+        if url.endswith('/'):
+            return url[:-1]
+        return url
+
+    @property
+    def token(self):
+        if self.__token is None:
+            self.__token = self._get_token()
+            if self.__token:
+                self.__password = None
+        return self.__token
+
+    def _get_token(self):
+        _date = _get_auth_data()
+        responce = self._request(self._build_url('token'), POST, _date)
+        if 'token' in responce:
+            return responce['token']
+        if 'errors' in responce and responce['errors'][0]['code'] == 'already_exists':
+            for auth in self._request(self._build_url('token')):
+                if auth['note'] == _date['note'] and auth['fingerprint'] == _date['fingerprint']:
+                    self._request(self._build_url('token', id=auth['id']), DELETE)
+                    return self._request(self._build_url('token'), POST, _date)['token']
+
+    def _get_headers(self):
+        headers = {}
+        if self.__password:
+            headers[_AUTH_HEADER] = _get_encoding_basic_credentials(self.__user, self.__password)
+        elif self.__token:
+            headers[_TOKEN_HEADER] = b'token ' + self.token.encode('ascii')
+        return headers
+
+    def _request(self, path, method=GET, data=None):
+        url = _API_URL.format(path=path)
+        if method in [DELETE]:
+            return _do_request(url, method, data, headers=self._get_headers())
+        return json.loads(_do_request(url, method, data, headers=self._get_headers()))
+
+    @property
+    def list(self):
+        return list(self.iter)
+
+    @property
+    def iter(self):
+        if self.__password or self.__token:
+            return (Gist(manager=self, **_g) for _g in self._request(self._build_url('gists')))
+        return (Gist(manager=self, **_g) for _g in self._request(self._build_url('user_gists', user=self.__user)))
+
+    def noteit_gists(self, user=''):
+        return (_g for _g in self.iter if _g.description.startswith(_GIST_NAME_PREFIX + '.' + user))
+
+    def get(self, id):
+        if self.__password or self.__token:
+            return Gist(manager=self, **self._request(self._build_url('gists', id=id)))
+        for _g in self.iter:
+            if str(_g.id) == str(id):
+                return _g
+
+    def create(self, description, files, public=False):
+        data = {'description': description, 'files': files, 'public': public}
+        return Gist(manager=self, **self._request(self._build_url('gists'), POST, data=data))
+
+    def update(self, id, description, files):
+        data = {'description': description, 'files': files}
+        return Gist(self._request(self._build_url('gists', id=id), PATCH, data=data))
+
+    def delete(self, id):
+        self._request(self._build_url('gists', id=id), DELETE)
+
+
+class _ProxyProperty(object):
+
+    def __init__(self, name, default=None):
+        self.name, self._default = name, default
+
+    def __get__(self, instance, owner):
+        if not instance:
+            return self
+        return instance._data.get(self.name, self._default() if self._default else None)
+
+    def __set__(self, instance, value):
+        if not instance:
+            return
+        instance._data[self.name] = value
+        instance._edited = True
+
+
+class Gist(object):
+
+    def __init__(self, manager, **kwargs):
+        self._manager, self._data = manager, kwargs
+        self._data.setdefault('public', False)
+        self.files = [GistFile(name, self, **_f) for name, _f in self._files.items()]
+
+    id = _ProxyProperty('id')
+    description = _ProxyProperty('description')
+    public = _ProxyProperty('public')
+    _files = _ProxyProperty('files', lambda: {})
+    _created = _ProxyProperty('created_at')
+
+    @property
+    def _files_dict(self):
+        return dict([(f.name, f.as_dict()) for f in self.files])
+
+    @property
+    def _edited_files_dict(self):
+        return dict([(f.name, f.as_dict()) for f in self.files if f._edited])
+
+    def add_file(self, name, content):
+        _f = self.get_file(name, GistFile)
+        if _f.content:
+            raise ValueError('File with name {} already exists'.format(name))
+        _f.content = content
+        self.files.append(_f)
+
+    def edit_file(self, name, content):
+        self.get_file(name).content = content
+
+    def get_file(self, name, default=None):
+        for _f in self.files:
+            if _f.name == name:
+                return _f
+        if default is not None:
+            return default(name=name, gist=self) if callable(default) else default
+        raise ValueError('No file with name {0}'.format(name))
+
+    def get_file_content(self, name):
+        return self.get_file(name).full_content
+
+    def save(self):
+        if self.id:
+            return self._manager.update(self.id, self.description, self._edited_files_dict)
+        return self._manager.create(self.description, self._files_dict, public=self.public)
+
+    def delete(self):
+        self._manager.delete(self.id)
+
+
+class GistFile(object):
+    def __init__(self, name, gist=None, **kwargs):
+        self.__name, self._data = name, kwargs
+        self._edited = self._delited = False
+        self.__gist = gist
+        self._new_name = None
+
+    truncated = property(lambda self: self._data.get('truncated'))
+    content = _ProxyProperty('content')
+    raw_url = _ProxyProperty('raw_url')
+
+    @property
+    def name(self):
+        return self.__name
+
+    def rename(self, value):
+        self._new_name = value
+
+    def as_dict(self):
+        if self._delited:
+            return
+        out = {}
+        if self._new_name:
+            out['filename'] = self._new_name
+        if self._edited:
+            out['content'] = self.content
+        return out
+
+    def delete(self):
+        self._edited = True
+        self._delited = True
+        if self.__gist:
+            self.save()
+
+    @property
+    def full_content(self):
+        if self.truncated or not self.content:
+            return _do_request(self.raw_url)
+        return self.content
+
+    def save(self):
+        self.__gist.save()
+
+
+def _get_auth_data():
+    return {'scopes': [_SCOPE], 'note': 'Noteit', 'fingerprint': platform.system() + '-' + platform.node(),
+            'note_url': 'https://github.com/Krukov/noteit'}
+
+
+def _get_gistfile_with_alias(alias, notebook=None, public=False):
+    gist = _get_gist_by_name(_get_gist_name(notebook, public))
+    if gist is None:
+        raise NotFoundError('Gist not found')
+    for _f in gist.files:
+        if _parse_file_name(_f.name)[0] == alias:
+            return _f
+
+
+def _get_gist_name(notebook=None, public=False):
+    name = _GIST_NAME_PREFIX
+    if notebook:
+        name += '.' + notebook
+    if get_options().anon:
+        name += '.' + _get_user()
+    name += '.' + ('public' if public else 'private')
+    return name
+
+
+def _get_gist_by_name(name):
+    _id = False
+    if _id:
+        return get_gist_manager().get(_id)
+    for _g in get_gist_manager().noteit_gists():
+        if _g.description == name:
+            return _g
+
+
+def _get_name_for_file(alias, type):
+    return '{0}#{1}.{2}'.format(alias, type, int(time.time() * 1000000))
+
+
+def _parse_file_name(name):
+    alias, meta = name.split('#')
+    try:
+        type, updated = meta.split('.')
+        updated = datetime.utcfromtimestamp(int(updated) / 1000000.0)
+    except ValueError:
+        type, updated = meta, 0
+    return alias, type, updated
+
+
+def _do_request(url, *args, **kwargs):
     """Make request and handle response"""
-    kwargs.setdefault('headers', {}).update(_get_headers())
-    response = _make_request(path, *args, **kwargs)
-    response._attrs = path, args, kwargs  # for retrying
-    return _response_handler(response)
-
-
-def retry(response):
-    """Retry last response"""
-    return do_request(response._attrs[0], *response._attrs[1], **response._attrs[2])
+    kwargs.setdefault('headers', {}).update(_get_default_headers())
+    response = _make_request(url, *args, **kwargs)
+    resp = _response_handler(response)
+    return resp
 
 
 def _response_handler(response):
     """Handle response status"""
-    response_body = response.read().decode('ascii')
-    response.close()
+    response_body = response.read().decode('utf-8')
     if response.status in [401, ]:
         raise AuthenticationError
     elif response.status > 500:
         raise ServerError
     elif response.status in [301, 302, 303, 307] and response._method != POST:
         raise AuthenticationError
-    return response_body, response.status
+    return response_body
 
 
 @cached_function
-def _get_connection():
+def _get_connection(host):
     """Create and return connection with host"""
-    host = _get_host()
-    if host.startswith('https://'):
-        host = host[8:]
-        connection = HTTPSConnection
-    else:
-        connection = HTTPConnection
-        host = host.replace('http://', '')
-    return connection(host, timeout=_TIMEOUT)
+    return HTTPSConnection(host, timeout=_TIMEOUT)
 
 
 def _make_request(url, method=GET, data=None, headers=None):
     """Generate request and send it"""
     headers = headers or {}
     method = method.upper()
-    conn = _get_connection()
+    conn = _get_connection(urlparse(url).hostname)
     if data:
-        data = urlencode(data).encode('ascii')
+        data = json.dumps(data).encode('ascii')
         if method == GET:
             url = '?'.join([url, data.decode('ascii') or ''])
             data = None
 
-    if method in [POST]:
-        headers.update({"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"})
+    if method in [POST, PUT, PATCH]:
+        headers.update({_CONTENT_TYPE_HEADER: "application/x-www-form-urlencoded"})
     conn.request(method, url, body=data, headers=headers)
-
     return conn.getresponse()
-
-
-@cached_function
-def _get_password():
-    """Return password from argument or asks user for it"""
-    return get_options().password or getpass.getpass(u'Input your password: ')
-
-
-@cached_function
-def _get_user():
-    """Return user from argument or asks user for it"""
-    return get_options().user or _get_from_stdin(u'Input username: ')
-
-
-def _get_key_from_stdin(type='encryption'):
-    return getpass.getpass(u'Input {0} key: '.format(type))
-
-
-@cached_function
-def _get_key():
-    """Return key to encode/decode from argument or from local"""
-    key = get_options().key
-    if key:
-        return _get_key_from_stdin()
-     
-    if not get_options().user and os.path.isfile(_KEY_PATH):
-        with open(_KEY_PATH) as key_file:
-            return key_file.read()
-    return _get_secret_hash()
-
-
-def _md5(message):
-    md5 = hashlib.md5()
-    md5.update(message.encode())
-    return md5.hexdigest()
-
-
-@cached_function
-def _get_secret_hash():
-    return _md5(_md5(_get_user() + _get_password()))
-
-
-def _save_key():
-    password = _get_secret_hash()
-    _save_file_or_ignore(_KEY_PATH, password)
-
-
-def _get_credentials():
-    """Return username and password"""
-    return _get_user(), _get_password()
 
 
 @cached_function
@@ -366,33 +520,93 @@ def _generate_user_agent_with_info():
     """Generete User-Agent with environment info"""
     return ' '.join([
         u'{0}/{1}'.format('Noteit', get_version()),
-        u'{i[0]}-{i[1]}/{i[2]}-{i[5]}'.format(i=platform.uname()),
     ])
 
 
-@cached_function
-def _get_encoding_basic_credentials():
+def _get_encoding_basic_credentials(user, password=''):
     """Return value of header for Basic Authentication"""
-    return b'basic ' + base64.b64encode(':'.join(_get_credentials()).encode('ascii'))
+    return b'Basic ' + base64.b64encode('{0}:{1}'.format(user, password).encode('ascii'))
 
 
-def _get_headers():
+def _get_default_headers():
     """Return dict of headers for request"""
-    headers = {
-        _USER_AGENT_HEADER: _get_user_agent(),
-        _CONTENT_TYPE_HEADER: 'application/json'
+    return {
+        _ACCEPT_HEADER: _APPLICATION_JSON,
+        _USER_AGENT_HEADER: _generate_user_agent_with_info(),
+        _CONTENT_TYPE_HEADER: _APPLICATION_JSON,
     }
-    if not get_options().user and not get_options().ignore and _get_token_from_system():
-        headers[_TOKEN_HEADER] = b'token ' + _get_token_from_system().encode('ascii')
-    else:
-        headers[_AUTH_HEADER] = _get_encoding_basic_credentials()
-        _save_key()
-    return headers
+
+# END GIST COMMUNICATIONS
 
 
-def _get_from_stdin(text):
-    """communication with stdin"""
-    return input(text)
+@cached_function
+def get_gist_manager():
+    if get_options().anon:
+        return _get_spec_manager()
+    if get_options().public and get_options().user:
+        return GistManager(user=get_options().user)
+    token = _get_token_from_system()
+    if token:
+        return GistManager(token=token)
+    first = GistManager(_get_user(), _get_password())
+    if first.token:
+        _save_token(first.token)
+    return first
+
+
+def _get_spec_manager():
+    return GistManager(token=_REPORT_TOKEN)
+
+
+@cached_function
+def _get_password():
+    """Return password from argument or asks user for it"""
+    return get_options().password or getpass.getpass(u'Input your password: ')
+
+
+@cached_function
+def _get_user():
+    """Return user from argument or asks user for it"""
+    return get_options().user or input(u'Input username: ')
+
+
+@cached_function
+def _get_key():
+    """Return key to encode/decode from argument or from local"""
+    return getpass.getpass(u'Input encryption key: ')
+
+
+def _md5(message):
+    md5 = hashlib.md5()
+    md5.update(message.encode())
+    return md5.hexdigest()
+
+
+def _get_token_from_system():
+    """Return token from file"""
+    if _TOKEN_ENV_VALUE in os.environ:
+        return os.environ.get(_TOKEN_ENV_VALUE)
+    if get_options().token:
+        return get_options().token
+    return _get_saved_token()
+
+
+def _save_token(token):
+    """Save token to file"""
+    _save_file_or_ignore(_TOKEN_PATH, _encrypt(token, platform.node()))
+
+
+def _get_saved_token():
+    if os.path.isfile(_TOKEN_PATH):
+        with open(_TOKEN_PATH) as _file:
+            encrypt_token = _file.read().strip()
+            return _decrypt(encrypt_token, platform.node())
+
+
+def _delete_token():
+    """Delete file with token"""
+    if os.path.exists(_TOKEN_PATH):
+        os.remove(_TOKEN_PATH)
 
 
 def _get_from_pipe():
@@ -411,39 +625,17 @@ def _is_debug():
     return '--debug' in sys.argv
 
 
-def _cache_notes(notes, notebook):
-    """Save notes in local file"""
-    path = _CACHE_PATH
-    if notebook:
-        path += '.' + notebook
-    _save_file_or_ignore(path, notes)
-
-
-def _get_notes_from_cache(notebook):
-    path = _CACHE_PATH
-    if notebook:
-        path += '.' + notebook
-    if not os.path.isfile(path):
-        return
-    with open(path) as _file:
-        return _file.read()
-
-
-def _get_note_from_cache(alias):
-    if not os.path.isfile(_CACHE_PATH):
-        return
-    with open(_CACHE_PATH) as _file:
-        notes = dict((item['alias'], item['text']) for item in json.loads(_file.read()))
-    note = notes.get(alias, None)
-    if note:
-        return json.dumps({'text': note})
+@cached_function
+def get_version():
+    """Return version of client"""
+    return __VERSION__
 
 
 def _save_file_or_ignore(path, content):
-    if not os.path.isdir(os.path.dirname(path)):
-        os.makedirs(os.path.dirname(path))
     if get_options().do_not_save:
         return
+    if not os.path.isdir(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
     with open(path, 'w') as _file:
         _file.write(content)
 
@@ -462,13 +654,14 @@ def _encrypt(message, key):
     return base64encode(crypted)
 
 
-def _encrypt_note(note):
-    if not note or get_options().do_not_encrypt or not _get_key():
-        return note
-    return _encrypt(note, _get_key())
-
-
 def _decrypt(message, key):
+    try:
+        return __decrypt(message, key)
+    except (UnicodeDecodeError, TypeError, AsciiError, ValueError, AttributeError):
+        raise DecryptError
+
+
+def __decrypt(message, key):
     """Decrypt message with b64decoding and {} alg"""
     message = base64decode(message)
     decrypted = ''
@@ -478,18 +671,17 @@ def _decrypt(message, key):
     return base64decode(decrypted)
 
 
-def _decrypt_note(note):
-    if not note or get_options().do_not_encrypt or not _get_key():
-        return note
-    try:
-        return _decrypt(note, _get_key())
-    except (UnicodeDecodeError, TypeError, AsciiError, ValueError, AttributeError):
-        raise DecryptError
+def _gen_info():
+    return ' '.join([
+        u'{0}/{1}'.format('Noteit', get_version()),
+        u'{i[0]}-{i[1]}/{i[2]}-{i[5]}'.format(i=platform.uname()),
+        u'{0}/{1}'.format(platform.python_implementation(), platform.python_version()),
+    ])
 
 
 def get_options_parser():
     """Arguments definition"""
-    parser = argparse.ArgumentParser(description='Tool for creating notes', prog='noteit')
+    parser = argparse.ArgumentParser(description='Tool for creating notes in your gists', prog='noteit')
 
     parser.add_argument('--version', action='version', version='%(prog)s ' + get_version(),
                         help='displays the current version of %(prog)s and exit')
@@ -499,25 +691,25 @@ def get_options_parser():
                         help='new note')
 
     parser.add_argument('-u', '--user', help='username')
-    parser.add_argument('-p', '--password', help='password')
+    parser.add_argument('--password', help='password')
+    parser.add_argument('-t', '--token', help='token')
+    parser.add_argument('--anon', help='for users without accounts',
+                        action='store_true')
 
-    parser.add_argument('-q', '--quiet', help='only display aliases', action='store_true')
+    parser.add_argument('-p', '--public', help='Public notes', action='store_true')
+
     parser.add_argument('--all', help='display all notes', action='store_true')
     parser.add_argument('-l', '--last', help='display last note', action='store_true')
     parser.add_argument('-a', '--alias', help='set alias for note / display note with given alias')
     parser.add_argument('-n', '--notebook', help='set notebook for note / display notes with given notebook')
 
-    parser.add_argument('-d', '--delete', help='delete note', action='store_true')
+    parser.add_argument('-d', '--delete', help='delete note/notebook', action='store_true')
 
     parser.add_argument('--do-not-save', help='disable savings any data locally',
                         action='store_true')
-    parser.add_argument('--do-not-encrypt', help='disable encrypting/decrypting notes',
-                        action='store_true')
-    parser.add_argument('-k', '--key', help='key to encrypting/decrypting notes (default is password base)',
+    parser.add_argument('-k', '--key', help='key to encrypting/decrypting notes',
                         action='store_true')
 
-    parser.add_argument('--anon', help='do not add OS and other info to user-agent header',
-                        action='store_true')
     parser.add_argument('-r', '--report', help=argparse.SUPPRESS, action='store_true')
 
     return parser
@@ -529,36 +721,57 @@ def get_options():
     return get_options_parser().parse_args()
 
 
-def main():
+def main(retry=True):
     """Main"""
     options = get_options()
+    if options.user or options.token or options.anon:
+        retry = False
     try:
         if options.note:
-            note = ' '.join(options.note) if isinstance(options.note, (list, tuple)) else options.note
-            alias = options.alias
-            if options.overwrite:
-                try:
-                    delete_note(_format_alias(alias))
-                except:
-                    pass
-            display(create_note(note, alias, options.notebook))
+            if not options.alias:
+                sys.exit('Нou must specify alias with option -a ')
 
-        elif options.alias is not None:
-            if options.delete:
-                display(delete_note(_format_alias(options.alias)))
+            note = u' '.join([w.decode('utf-8') for w in options.note]) if isinstance(options.note, (list, tuple)) \
+                else options.note.decode('utf-8')
+            res = create_note(note, options.alias, options.notebook, options.public,
+                              _TEXT_TYPE if not options.key else _ENCRYPT_TYPE)
+            if res:
+                print('Saved')
             else:
-                display(get_note(_format_alias(options.alias)))
+                print('Canceled')
+        elif options.alias is not None:
+            if options.delete and input(u'Are you really want to delete note? ') in _YES:
+                delete_note(_format_alias(options.alias), options.notebook, options.public)
+                print(u'Note {0} deleted'.format(options.alias))
+            else:
+                print(get_note(_format_alias(options.alias), options.notebook, options.public))
         elif options.last:
-            display(get_last_note())
+            print(get_last_note(options.notebook, options.public))
+        elif options.delete and options.notebook:
+            if input(u'Are you really want to delete all notes in notebook "{0}"?'
+                     u' '.format(options.notebook)) not in _YES:
+                print(u'Canceled')
+            else:
+                delete_notebook(options.notebook, options.public)
+                print('Notebook "{}" deleted'.format(options.notebook))
         else:
-            display(get_notes(all=options.all, notebook=options.notebook, quiet=options.quiet))
+            for out in get_notes(all=options.all, notebook=options.notebook, public=options.public):
+                print(out)
 
     except KeyboardInterrupt:
         sys.exit('\n')
     except AuthenticationError:
-        sys.exit(u'Error in authentication. Username maybe occupied')
+        if retry:
+            _delete_token()
+            main(retry=False)
+
+        sys.exit(u'Error in authentication')
     except ServerError:
         sys.exit(u'Sorry there is server error. Please, try again later')
+    except NotFoundError as e:
+        sys.exit(str(e))
+    except DecryptError:
+        sys.exit('Decrypt Error')
     except (ConnectionError, gaierror):
         sys.exit(u'Something wrong with connection, check your internet connection or try again later')
     except Exception:
