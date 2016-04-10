@@ -51,7 +51,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.17.2'
+__VERSION__ = '0.777'
 
 ALPHA = string.ascii_letters + string.digits + '=_-'  # never change it
 
@@ -443,7 +443,7 @@ def _get_gist_name(notebook=None, public=False):
 
 
 def _get_gist_by_name(name):
-    _id = False
+    _id = False  # Add local cache to optimize number or request to github gists
     if _id:
         return get_gist_manager().get(_id)
     for _g in get_gist_manager().noteit_gists():
