@@ -1,5 +1,5 @@
 ======================================
-noteit - create and get notes anywhere 
+old noteit - create and get notes anywhere 
 ======================================
 
 Make Notes with CLI (zero dependence)
