@@ -10,7 +10,6 @@ import os
 import platform
 import hashlib
 import select
-import string
 import sys
 import time
 import traceback
@@ -26,6 +25,7 @@ try:
     from urlparse import urlparse
     from socket import error as ConnectionError
     input = raw_input
+    chr = unichr
 
     from itertools import izip
     zip = izip
@@ -42,6 +42,8 @@ except ImportError:
     from urllib.parse import urlencode, quote, urlparse
 
     def base64encode(message):
+        if isinstance(message, type(b'')):
+            message = message.decode()
         return base64.urlsafe_b64encode(message.encode()).decode()
 
     def base64decode(message):
@@ -52,12 +54,10 @@ _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
 __VERSION__ = '0.777'
-_UPDATE_CMD = 'noteit -u Krukov --public -a update| sh'
-
-ALPHA = string.ascii_letters + string.digits + '=_-'  # never change it
+_UPDATE_CMD = 'noteit -u Krukov --public -a update| sudo sh'
 
 _PATH = os.path.expanduser('~/.noteit/')
-_TOKEN_PATH = os.path.join(_PATH, 'noteit.tkn')
+_TOKEN_PATH = os.path.join(_PATH, 'noteit.v2.tkn')
 _CACHE_PATH = os.path.join(_PATH, '.cache')
 _TOKEN_ENV_VALUE = 'GIST_TOKEN'
 
@@ -82,7 +82,7 @@ _URL_MAP = {
 _REPORT_GIST = 'noteit.report'
 _GIST_NAME_PREFIX = 'noteit'
 _GIST_FILENAME = '{alias}.{type}'
-_REPORT_TOKEN = 'f43cee85b9196c83512f0055e503268ab671dd2b'
+_REPORT_TOKEN = 'wo3CrXjClMKuwot_w5DCvWvCqmjCr8KTwrPCscKvw595w5HCssK4wp_CoMKDwonCrMOQwo7CgMK7wqjCgsKdwpHDjMKueMKGw5zCs8KQwrpjwrzCtcOKwqTCsMKswonDkMK-w4t0cw=='
 _TYPES = _TEXT_TYPE, _FILE_TYPE, _ENCRYPT_TYPE = ['text', 'file', 'entext']
 
 _DECRYPT_ERROR_MSG = u"Error - can't decrypt note"
@@ -92,13 +92,16 @@ _TRUE = u'\u2713'
 _YES = [u'yes', u'y', u'poehali']
 _FORMAT = _DATE_FORMAT = '%d-%m-%y %H:%M'
 _CREDENTIALS_WARNING = u'''
-WARNING: Noteit use GitHub Gist as store!
-Noteit does not store you password or login.
-Noteit does not use your credention for taking something from your GitHub account, except some of your Gists.
-Noteit create Personal token, encrypt and save them locally
-Input username and password of your github account:
+WARNING: Noteit uses the GitHub Gist as store for notes!
+Noteit does not store your password or login.
+Noteit does not use your credentials for taking something from your GitHub account, except some of your Gists.
+Noteit creates the Personal token containing access only to gists, encrypt and save them locally.
+Input username and password for your github account or use --anon option:
 '''
-
+_ANON_INTRODUCTION = u'''At 'anonymous' mode your notes saved at the overall github account, so everybody have access to them.
+Noteit asks for your name just to separate the general account to some namespace, so you can use any username.
+We recommend use '--anon' option with '-u' option to skip prompt and '-k' option to encrypt your notes.
+'''
 
 if sys.getdefaultencoding().lower() != 'utf-8':
     _TRUE = '*'
@@ -144,7 +147,7 @@ def cached_function(func):
     return _func
 
 
-def get_notes(all=False, notebook=None, public=False):
+def get_notes(all=False, notebook=None, public=False, user=''):
     """Return user's notes as string"""
     template = _TEMPLATE
     if all:
@@ -154,9 +157,13 @@ def get_notes(all=False, notebook=None, public=False):
     yield template.replace(u'<', u'^').format(alias='ALIAS', notebook='NOTEBOOK',
                                               updated='UPDATED', public='PUBLIC')
 
-    for gist in objects.noteit_gists():
-        meta = gist.description.split('.')[1:]
+    for gist in objects.noteit_gists(user):
+        meta = gist.description.split('.')[2 if user else 1:]
+        if len(meta) > 2:
+            continue
         _notebook, _rule = meta if len(meta) == 2 else (None, meta[0])
+        if user and gist.description.split('.')[1] != user:
+            continue
         if not all:
             if public and _rule != 'public':
                 continue
@@ -170,9 +177,9 @@ def get_notes(all=False, notebook=None, public=False):
                                   updated=updated.strftime(_FORMAT) if updated else 'unknown')
 
 
-def get_note(alias, notebook=None, public=False):
+def get_note(alias, notebook=None, public=False, user=''):
     """Return user note of given alias"""
-    _f = _get_gistfile_with_alias(alias, notebook=notebook, public=public)
+    _f = _get_gistfile_with_alias(alias, notebook=notebook, public=public, user=user)
     if _f is None:
         raise NotFoundError('Note not found')
     if _parse_file_name(_f.name)[1] == _ENCRYPT_TYPE or get_options().key:
@@ -180,17 +187,17 @@ def get_note(alias, notebook=None, public=False):
     return _f.full_content
 
 
-def delete_note(alias, notebook=None, public=False):
+def delete_note(alias, notebook=None, public=False, user=''):
     """Delete/remove user note of given alias"""
-    _f = _get_gistfile_with_alias(alias, notebook=notebook, public=public)
+    _f = _get_gistfile_with_alias(alias, notebook=notebook, public=public, user=user)
     if _f is None:
         raise NotFoundError('Note not found')
     return _f.delete()
 
 
-def get_last_note(notebook=None, public=False):
+def get_last_note(notebook=None, public=False, user=''):
     """Return last saved note"""
-    gist = _get_gist_by_name(_get_gist_name(notebook, public))
+    gist = _get_gist_by_name(_get_gist_name(notebook, public, user=user))
     now = datetime.utcnow()
     last_f = sorted(gist.files, key=lambda _f: _parse_file_name(_f.name)[-1] or now)
     if not last_f:
@@ -200,18 +207,18 @@ def get_last_note(notebook=None, public=False):
     return last_f[0].full_content
 
 
-def delete_notebook(notebook, public=False):
-    _g = _get_gist_by_name(_get_gist_name(notebook, public))
+def delete_notebook(notebook, public=False, user=''):
+    _g = _get_gist_by_name(_get_gist_name(notebook, public, user=user))
     if _g is None:
         raise NotFoundError('Notebook not found')
     return _g.delete()
 
 
-def create_note(note, alias=None, notebook=None, public=False, type=_TEXT_TYPE):
+def create_note(note, alias=None, notebook=None, public=False, type=_TEXT_TYPE, user=''):
     """Make note"""
     if type == _ENCRYPT_TYPE:
         note = _encrypt(note, _get_key())
-    gist_name = _get_gist_name(notebook, public)
+    gist_name = _get_gist_name(notebook, public, user=user)
     gist = _get_gist_by_name(gist_name)
     if gist:
         for _f in gist.files:
@@ -233,7 +240,7 @@ def create_note(note, alias=None, notebook=None, public=False, type=_TEXT_TYPE):
 
 def report(tb):
     """Make traceback and etc. to server"""
-    _g = Gist(manager=_get_spec_manager(), description=(get_options().user or 'unknown') + str(time.time()))
+    _g = Gist(manager=_get_spec_manager(), description=(get_options().user or 'unknown') + '.' + str(time.time()))
     _g.public = False
     _g.add_file('tb', tb)
     _g.add_file('info', _gen_info())
@@ -439,8 +446,8 @@ def _get_auth_data():
             'note_url': 'https://github.com/Krukov/noteit'}
 
 
-def _get_gistfile_with_alias(alias, notebook=None, public=False):
-    gist = _get_gist_by_name(_get_gist_name(notebook, public))
+def _get_gistfile_with_alias(alias, notebook=None, public=False, user=''):
+    gist = _get_gist_by_name(_get_gist_name(notebook, public, user=user))
     if gist is None:
         raise NotFoundError('Gist not found')
     for _f in gist.files:
@@ -448,14 +455,9 @@ def _get_gistfile_with_alias(alias, notebook=None, public=False):
             return _f
 
 
-def _get_gist_name(notebook=None, public=False):
-    name = _GIST_NAME_PREFIX
-    if notebook:
-        name += '.' + notebook
-    if get_options().anon:
-        name += '.' + _get_user()
-    name += '.' + ('public' if public else 'private')
-    return name
+def _get_gist_name(notebook=None, public=False, user=''):
+    name = '.'.join([_GIST_NAME_PREFIX, user, notebook or '', 'public' if public else 'private'])
+    return name.replace('..', '.').replace('..', '.')
 
 
 def _get_gist_by_name(name):
@@ -533,7 +535,7 @@ def _get_user_agent():
 
 
 def _generate_user_agent_with_info():
-    """Generete User-Agent with environment info"""
+    """Generate User-Agent with environment info"""
     return ' '.join([
         u'{0}/{1}'.format('Noteit', get_version()),
     ])
@@ -564,7 +566,8 @@ def get_gist_manager():
     token = _get_token_from_system()
     if token:
         return GistManager(token=token)
-    print(_CREDATIONS_WARNING)
+    if not get_options().user:
+        print(_CREDENTIALS_WARNING)
     first = GistManager(_get_user(), _get_password())
     if first.token:
         _save_token(first.token)
@@ -572,11 +575,12 @@ def get_gist_manager():
 
 
 def _get_spec_manager():
-    manager =  GistManager(token=_decrypt(_REPORT_TOKEN, get_version()))
+    manager = GistManager(token=_decrypt(_REPORT_TOKEN, get_version().replace('.', '_')))
     try:
-        manager.list()
+        manager.list
     except AuthenticationError:
         raise UpdateRequiredError()
+    return manager
 
 
 @cached_function
@@ -601,6 +605,10 @@ def _md5(message):
     md5 = hashlib.md5()
     md5.update(message.encode())
     return md5.hexdigest()
+
+
+def _double_md5(message):
+    return _md5(_md5(message))
 
 
 def _get_token_from_system():
@@ -669,10 +677,9 @@ def _encrypt(message, key):
     """Encrypt message with b64encoding and {} alg"""
     message = base64encode(message)
     crypted = ''
-    for pair in zip(message, cycle(key)):
-        total = ALPHA.index(pair[0]) + ALPHA.index(pair[1])
-        crypted += ALPHA[total % len(ALPHA)]
-    return base64encode(crypted)
+    for pair in zip(message, cycle(_double_md5(key))):
+        crypted += chr((ord(pair[0]) + ord(pair[1])) % 256)
+    return base64encode(crypted.encode('utf-8'))
 
 
 def _decrypt(message, key):
@@ -686,10 +693,9 @@ def __decrypt(message, key):
     """Decrypt message with b64decoding and {} alg"""
     message = base64decode(message)
     decrypted = ''
-    for pair in zip(message, cycle(key)):
-        total = ALPHA.index(pair[0]) - ALPHA.index(pair[1])
-        decrypted += ALPHA[total % len(ALPHA)]
-    return base64decode(decrypted)
+    for pair in zip(message, cycle(_double_md5(key))):
+        decrypted += chr((ord(pair[0]) - ord(pair[1])) % 256)
+    return base64decode(decrypted.encode('utf-8'))
 
 
 def _gen_info():
@@ -745,9 +751,14 @@ def get_options():
 def main(retry=True):
     """Main"""
     options = get_options()
+    user = ''
     if options.user or options.token or options.anon:
         retry = False
     try:
+        if options.anon:
+            if not options.user:
+                print(_ANON_INTRODUCTION)
+            user = _get_user()
         if options.note:
             if not options.alias:
                 sys.exit('You must specify alias with option -a ')
@@ -755,28 +766,28 @@ def main(retry=True):
             note = u' '.join([w.decode('utf-8') for w in options.note]) if isinstance(options.note, (list, tuple)) \
                 else options.note.decode('utf-8')
             res = create_note(note, options.alias, options.notebook, options.public,
-                              _TEXT_TYPE if not options.key else _ENCRYPT_TYPE)
+                              _TEXT_TYPE if not options.key else _ENCRYPT_TYPE, user)
             if res:
                 print('Saved')
             else:
                 print('Canceled')
         elif options.alias is not None:
             if options.delete and input(u'Are you really want to delete note? ') in _YES:
-                delete_note(_format_alias(options.alias), options.notebook, options.public)
+                delete_note(_format_alias(options.alias), options.notebook, options.public, user)
                 print(u'Note {0} deleted'.format(options.alias))
             else:
-                print(get_note(_format_alias(options.alias), options.notebook, options.public))
+                print(get_note(_format_alias(options.alias), options.notebook, options.public, user))
         elif options.last:
-            print(get_last_note(options.notebook, options.public))
+            print(get_last_note(options.notebook, options.public, user))
         elif options.delete and options.notebook:
             if input(u'Are you really want to delete all notes in notebook "{0}"?'
                      u' '.format(options.notebook)) not in _YES:
                 print(u'Canceled')
             else:
-                delete_notebook(options.notebook, options.public)
+                delete_notebook(options.notebook, options.public, user)
                 print('Notebook "{}" deleted'.format(options.notebook))
         else:
-            for out in get_notes(all=options.all, notebook=options.notebook, public=options.public):
+            for out in get_notes(all=options.all, notebook=options.notebook, public=options.public, user=user):
                 print(out)
 
     except KeyboardInterrupt:
@@ -794,8 +805,7 @@ def main(retry=True):
     except DecryptError:
         sys.exit('Decrypt Error')
     except UpdateRequiredError:
-        sys.exit('Please, update noteit {0}'.format(_UPDATE_CMD))
-
+        sys.exit('Please, update noteit with "{0}"'.format(_UPDATE_CMD))
     except (ConnectionError, gaierror):
         sys.exit(u'Something wrong with connection, check your internet connection or try again later')
     except Exception:
