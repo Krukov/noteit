@@ -30,3 +30,6 @@ clean:
 
 release: gch_stable merge mini commit tag pypi_pull
 	echo 'YO!'
+
+encrypt%:
+	@python -c "from client import _encrypt, get_version; print(_encrypt('$*'.strip(), get_version().replace('.', '_')))"

@@ -52,6 +52,7 @@ _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
 __VERSION__ = '0.777'
+_UPDATE_CMD = 'noteit -u Krukov --public -a update| sh'
 
 ALPHA = string.ascii_letters + string.digits + '=_-'  # never change it
 
@@ -90,6 +91,14 @@ _TEMPLATE_N = u' {notebook:^12} ' + _TEMPLATE
 _TRUE = u'\u2713'
 _YES = [u'yes', u'y', u'poehali']
 _FORMAT = _DATE_FORMAT = '%d-%m-%y %H:%M'
+_CREDENTIALS_WARNING = u'''
+WARNING: Noteit use GitHub Gist as store!
+Noteit does not store you password or login.
+Noteit does not use your credention for taking something from your GitHub account, except some of your Gists.
+Noteit create Personal token, encrypt and save them locally
+Input username and password of your github account:
+'''
+
 
 if sys.getdefaultencoding().lower() != 'utf-8':
     _TRUE = '*'
@@ -107,10 +116,17 @@ class ServerError(Exception):
 
 class DecryptError(Exception):
     """Error if can't decrypt note"""
+    pass
 
 
 class NotFoundError(Exception):
     """Error if can't decrypt note"""
+    pass
+
+
+class UpdateRequiredError(Exception):
+    """Error at wrong version"""
+    pass
 
 
 def cached_function(func):
@@ -548,6 +564,7 @@ def get_gist_manager():
     token = _get_token_from_system()
     if token:
         return GistManager(token=token)
+    print(_CREDATIONS_WARNING)
     first = GistManager(_get_user(), _get_password())
     if first.token:
         _save_token(first.token)
@@ -555,7 +572,11 @@ def get_gist_manager():
 
 
 def _get_spec_manager():
-    return GistManager(token=_REPORT_TOKEN)
+    manager =  GistManager(token=_decrypt(_REPORT_TOKEN, get_version()))
+    try:
+        manager.list()
+    except AuthenticationError:
+        raise UpdateRequiredError()
 
 
 @cached_function
@@ -729,7 +750,7 @@ def main(retry=True):
     try:
         if options.note:
             if not options.alias:
-                sys.exit('Нou must specify alias with option -a ')
+                sys.exit('You must specify alias with option -a ')
 
             note = u' '.join([w.decode('utf-8') for w in options.note]) if isinstance(options.note, (list, tuple)) \
                 else options.note.decode('utf-8')
@@ -772,6 +793,9 @@ def main(retry=True):
         sys.exit(str(e))
     except DecryptError:
         sys.exit('Decrypt Error')
+    except UpdateRequiredError:
+        sys.exit('Please, update noteit {0}'.format(_UPDATE_CMD))
+
     except (ConnectionError, gaierror):
         sys.exit(u'Something wrong with connection, check your internet connection or try again later')
     except Exception:
