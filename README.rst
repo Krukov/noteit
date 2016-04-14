@@ -24,8 +24,6 @@ Features
 * \:beginner: Easy to use.
 * >_ CLI - that's awesome. Work at all platforms (I hope).
 
-.. image:: https://github.com/Krukov/noteit/raw/master/demo.gif
-
 
 How it works
 -------------
@@ -65,33 +63,35 @@ How to use
 	$ /# noteit 
 	>Input username: newUser
 	>Input your password: ****
-	>You do not have notes
-	$ /# noteit My first note
-	>Saved
+	        ALIAS               UPDATED        PUBLIC
+   	        public           09-04-16 22:31      ✓   
+                readme           10-04-16 23:39          
+	$ /# noteit new note -a new
+	Saved
 	$ /# echo "Noteit can get note from pipe" | noteit -a print_pipe
-	>Saved
+	Saved
 	$ /# noteit 
-	>        ALIAS                     NOTE
-	>
-	> print_pipe      Noteit can get note from pipe
-	>  suscipit       My first note
-	$ /# noteit echo "You can run it"
-	>Saved
+	        ALIAS               UPDATED        PUBLIC
+   	        public           09-04-16 22:31      ✓   
+        	readme           10-04-16 23:39          
+      	      print_pipe         13-04-16 23:17          
+      	$ /# noteit echo "You can run it" -a test
+	Saved
 	$ /# noteit -l | sh
 	You can run it
 	$ /# noteit Create note with alias and in notebook -a alias -n mynotebook
-	>Saved
+	Saved
 	$ /# noteit --all
-	>   NOTEBOOK       ALIAS                               NOTE
-	>
-	> mynotebook      alias     Create note with alias and in notebook
-	>              print_pipe   Noteit can get note from pipe
-	>               suscipit    My first note
-	$ /# noteit -a alias
-	>Create note with alias
+	   NOTEBOOK           ALIAS               UPDATED        PUBLIC
+	   __main__           public           13-04-16 23:19      *   
+	   __main__           readme           10-04-16 23:39          
+   	   __main__         print_pipe         13-04-16 23:17          
+	  mynotebook          alias            13-04-16 23:24
+	$ /# noteit -a alias -n mynotebook
+	Create note with alias and in notebook
 	$ /# noteit Super secret note -a ss --key
-	>Input encryption key: *****
-	>Saved
+	Input encryption key: *****
+	Saved
 
 
 *FUTURE*
