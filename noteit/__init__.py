@@ -9,6 +9,7 @@ import json
 import os
 import platform
 import hashlib
+import logging
 import select
 import sys
 import time
@@ -18,6 +19,7 @@ from itertools import cycle
 from socket import gaierror
 from binascii import Error as AsciiError
 
+PY = 2
 try:
     # Python 2
     from httplib import HTTPConnection, HTTPSConnection
@@ -38,6 +40,7 @@ try:
 
 except ImportError:
     # Python 3
+    PY = 3
     from http.client import HTTPConnection, HTTPSConnection
     from urllib.parse import urlencode, quote, urlparse
 
@@ -53,7 +56,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.777'
+__VERSION__ = '0.777.1'
 _UPDATE_CMD = 'noteit -u Krukov --public -a update| sudo sh'
 
 _PATH = os.path.expanduser('~/.noteit/')
@@ -82,7 +85,7 @@ _URL_MAP = {
 _REPORT_GIST = 'noteit.report'
 _GIST_NAME_PREFIX = 'noteit'
 _GIST_FILENAME = '{alias}.{type}'
-_REPORT_TOKEN = 'wo3CrXjClMKuwot_w5DCvWvCqmjCr8KTwrPCscKvw595w5HCssK4wp_CoMKDwonCrMOQwo7CgMK7wqjCgsKdwpHDjMKueMKGw5zCs8KQwrpjwrzCtcOKwqTCsMKswonDkMK-w4t0cw=='
+_REPORT_TOKEN = 'wr3CrMKnasKDwovCp8Kdwo3Ck8KpwprChsKYwoTDncKFw57CqsKfwq_CjcOJwprCscKKwoLCo8KMe8K8wq3CssKcw4DCosKDeMKuwqnCg8K4wrnClcKTwrrCm8OQwobCq8K6wp7Cu8Kgwp5t'
 _TYPES = _TEXT_TYPE, _FILE_TYPE, _ENCRYPT_TYPE = ['text', 'file', 'entext']
 
 _DECRYPT_ERROR_MSG = u"Error - can't decrypt note"
@@ -105,6 +108,7 @@ We recommend use '--anon' option with '-u' option to skip prompt and '-k' option
 
 if sys.getdefaultencoding().lower() != 'utf-8':
     _TRUE = '*'
+logging.captureWarnings(True)
 
 
 class AuthenticationError(Exception):
@@ -651,7 +655,7 @@ def _get_from_pipe():
 def _is_debug():
     if _DEBUG:
         return True
-    return '--debug' in sys.argv
+    return u'--debug' in sys.argv
 
 
 @cached_function
@@ -670,7 +674,8 @@ def _save_file_or_ignore(path, content):
 
 
 def _format_alias(alias):
-    return quote(alias, safe='')
+    # return quote(alias, safe='')
+    return alias
 
 
 def _encrypt(message, key):
@@ -758,36 +763,41 @@ def main(retry=True):
         if options.anon:
             if not options.user:
                 print(_ANON_INTRODUCTION)
-            user = _get_user()
+            user = _get_user().decode('utf-8') if PY == 2 else _get_user()
+        alias = options.alias.decode('utf-8') if PY == 2 and options.alias else options.alias
+        notebook = options.notebook.decode('utf-8') if PY == 2 and options.notebook else options.notebook
         if options.note:
-            if not options.alias:
+            if not alias:
                 sys.exit('You must specify alias with option -a ')
-
-            note = u' '.join([w.decode('utf-8') for w in options.note]) if isinstance(options.note, (list, tuple)) \
-                else options.note.decode('utf-8')
-            res = create_note(note, options.alias, options.notebook, options.public,
+            if PY == 2:
+                note = u' '.join([w.decode('utf-8') for w in options.note]) if isinstance(options.note, (list, tuple)) \
+                    else options.note.decode('utf-8')
+            else:
+                note = u' '.join([w for w in options.note]) if isinstance(options.note, (list, tuple)) \
+                    else options.note
+            res = create_note(note, alias, notebook, options.public,
                               _TEXT_TYPE if not options.key else _ENCRYPT_TYPE, user)
             if res:
                 print('Saved')
             else:
                 print('Canceled')
-        elif options.alias is not None:
+        elif alias is not None:
             if options.delete and input(u'Are you really want to delete note? ') in _YES:
-                delete_note(_format_alias(options.alias), options.notebook, options.public, user)
-                print(u'Note {0} deleted'.format(options.alias))
+                delete_note(_format_alias(alias), notebook, options.public, user)
+                print(u'Note "{0}"" deleted'.format(alias))
             else:
-                print(get_note(_format_alias(options.alias), options.notebook, options.public, user))
+                print(get_note(_format_alias(alias), notebook, options.public, user))
         elif options.last:
-            print(get_last_note(options.notebook, options.public, user))
-        elif options.delete and options.notebook:
+            print(get_last_note(notebook, options.public, user))
+        elif options.delete and notebook:
             if input(u'Are you really want to delete all notes in notebook "{0}"?'
                      u' '.format(options.notebook)) not in _YES:
                 print(u'Canceled')
             else:
                 delete_notebook(options.notebook, options.public, user)
-                print('Notebook "{}" deleted'.format(options.notebook))
+                print('Notebook "{}" deleted'.format(notebook))
         else:
-            for out in get_notes(all=options.all, notebook=options.notebook, public=options.public, user=user):
+            for out in get_notes(all=options.all, notebook=notebook, public=options.public, user=user):
                 print(out)
 
     except KeyboardInterrupt:
