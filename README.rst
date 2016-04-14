@@ -61,7 +61,7 @@ How to use
 ::
 
 	$ /# noteit 
-	>Input username: newUser
+	>Input username: github_login
 	>Input your password: ****
 	        ALIAS               UPDATED        PUBLIC
    	        public           09-04-16 22:31      ✓   
@@ -83,7 +83,7 @@ How to use
 	Saved
 	$ /# noteit --all
 	   NOTEBOOK           ALIAS               UPDATED        PUBLIC
-	   __main__           public           13-04-16 23:19      *   
+	   __main__           public           09-04-16 22:31      ✓   
 	   __main__           readme           10-04-16 23:39          
    	   __main__         print_pipe         13-04-16 23:17          
 	  mynotebook          alias            13-04-16 23:24
