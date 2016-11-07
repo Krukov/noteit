@@ -56,7 +56,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.777.1'
+__VERSION__ = '1.0.0'
 
 _PATH = os.path.expanduser('~/.noteit/')
 _TOKEN_PATH = os.path.join(_PATH, 'noteit.v2.tkn')
@@ -84,7 +84,7 @@ _URL_MAP = {
 _REPORT_GIST = 'noteit.report'
 _GIST_NAME_PREFIX = 'noteit'
 _GIST_FILENAME = '{alias}.{type}'
-_REPORT_TOKEN = 'wr3CrMKnasKDwovCp8Kdwo3Ck8KpwprChsKYwoTDncKFw57CqsKfwq_CjcOJwprCscKKwoLCo8KMe8K8wq3CssKcw4DCosKDeMKuwqnCg8K4wrnClcKTwrrCm8OQwobCq8K6wp7Cu8Kgwp5t'
+_REPORT_TOKEN = 'woLCrMKhw5nCvcK8wrDCoX_Cj8KFwqDCsHbCjsOMwo_CsnlswrB9wrHCm8KPwqjChGnCj8KMwp_Cn8KPwobCmsOJwr3Dn8Kowp_CisKMecKhwrrCrMKXwpXCkMKMesKlwq53wqBw'
 _TYPES = _TEXT_TYPE, _FILE_TYPE, _ENCRYPT_TYPE = ['text', 'file', 'entext']
 
 _DECRYPT_ERROR_MSG = u"Error - can't decrypt note"
