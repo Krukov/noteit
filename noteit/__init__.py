@@ -23,7 +23,7 @@ PY = 2
 try:
     # Python 2
     from httplib import HTTPConnection, HTTPSConnection
-    from urllib import urlencode, quote
+    from urllib import urlencode
     from urlparse import urlparse
     from socket import error as ConnectionError
     input = raw_input
@@ -42,7 +42,7 @@ except ImportError:
     # Python 3
     PY = 3
     from http.client import HTTPConnection, HTTPSConnection
-    from urllib.parse import urlencode, quote, urlparse
+    from urllib.parse import urlencode, urlparse
 
     def base64encode(message):
         if isinstance(message, type(b'')):
@@ -56,8 +56,7 @@ except ImportError:
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '0.777.1'
-_UPDATE_CMD = 'noteit -u Krukov --public -a update| sudo sh'
+__VERSION__ = '1.0.0'
 
 _PATH = os.path.expanduser('~/.noteit/')
 _TOKEN_PATH = os.path.join(_PATH, 'noteit.v2.tkn')
@@ -85,11 +84,11 @@ _URL_MAP = {
 _REPORT_GIST = 'noteit.report'
 _GIST_NAME_PREFIX = 'noteit'
 _GIST_FILENAME = '{alias}.{type}'
-_REPORT_TOKEN = 'wr3CrMKnasKDwovCp8Kdwo3Ck8KpwprChsKYwoTDncKFw57CqsKfwq_CjcOJwprCscKKwoLCo8KMe8K8wq3CssKcw4DCosKDeMKuwqnCg8K4wrnClcKTwrrCm8OQwobCq8K6wp7Cu8Kgwp5t'
+_REPORT_TOKEN = 'woLCrMKhw5nCvcK8wrDCoX_Cj8KFwqDCsHbCjsOMwo_CsnlswrB9wrHCm8KPwqjChGnCj8KMwp_Cn8KPwobCmsOJwr3Dn8Kowp_CisKMecKhwrrCrMKXwpXCkMKMesKlwq53wqBw'
 _TYPES = _TEXT_TYPE, _FILE_TYPE, _ENCRYPT_TYPE = ['text', 'file', 'entext']
 
 _DECRYPT_ERROR_MSG = u"Error - can't decrypt note"
-_TEMPLATE = u' {alias:^20} {updated:^20} {public:^6}'
+_TEMPLATE = u' {alias:^35} {updated:^20} {public:^6}'
 _TEMPLATE_N = u' {notebook:^12} ' + _TEMPLATE
 _TRUE = u'\u2713'
 _YES = [u'yes', u'y', u'poehali']
@@ -138,7 +137,6 @@ class UpdateRequiredError(Exception):
 
 def cached_function(func):
     """Decorator that cache function result at first call and return cached result other calls """
-
     def _func(*args, **kwargs):
         force = kwargs.pop(_PASS_CACHE_KWARG, False)
         _cache_name = _CACHED_ATTR + _md5(json.dumps({'k': kwargs, 'a': args}))
@@ -374,7 +372,7 @@ class Gist(object):
     def add_file(self, name, content):
         _f = self.get_file(name, GistFile)
         if _f.content:
-            raise ValueError('File with name {} already exists'.format(name))
+            raise ValueError('File with name {0} already exists'.format(name))
         _f.content = content
         self.files.append(_f)
 
@@ -446,8 +444,7 @@ class GistFile(object):
 
 
 def _get_auth_data():
-    return {'scopes': [_SCOPE], 'note': 'Noteit', 'fingerprint': platform.system() + '-' + platform.node(),
-            'note_url': 'https://github.com/Krukov/noteit'}
+    return {'scopes': [_SCOPE], 'note': 'Noteit', 'fingerprint': platform.system() + '-' + platform.node()}
 
 
 def _get_gistfile_with_alias(alias, notebook=None, public=False, user=''):
@@ -465,9 +462,6 @@ def _get_gist_name(notebook=None, public=False, user=''):
 
 
 def _get_gist_by_name(name):
-    _id = False  # Add local cache to optimize number or request to github gists
-    if _id:
-        return get_gist_manager().get(_id)
     for _g in get_gist_manager().noteit_gists():
         if _g.description == name:
             return _g
@@ -674,7 +668,6 @@ def _save_file_or_ignore(path, content):
 
 
 def _format_alias(alias):
-    # return quote(alias, safe='')
     return alias
 
 
@@ -795,7 +788,7 @@ def main(retry=True):
                 print(u'Canceled')
             else:
                 delete_notebook(options.notebook, options.public, user)
-                print('Notebook "{}" deleted'.format(notebook))
+                print('Notebook "{0}" deleted'.format(notebook))
         else:
             for out in get_notes(all=options.all, notebook=notebook, public=options.public, user=user):
                 print(out)
@@ -815,7 +808,7 @@ def main(retry=True):
     except DecryptError:
         sys.exit('Decrypt Error')
     except UpdateRequiredError:
-        sys.exit('Please, update noteit with "{0}"'.format(_UPDATE_CMD))
+        sys.exit('Please, update noteit with "pip install -U noteit"')
     except (ConnectionError, gaierror):
         sys.exit(u'Something wrong with connection, check your internet connection or try again later')
     except Exception:
