@@ -14,6 +14,7 @@ import select
 import sys
 import time
 import traceback
+from collections import namedtuple
 from datetime import datetime
 from itertools import cycle
 from socket import gaierror
@@ -53,10 +54,16 @@ except ImportError:
         return base64.urlsafe_b64decode(message).decode()
 
 
+Note = namedtuple('Note', ['alias', 'notebook', 'date', 'public'])
+SORTING = {
+    'date': lambda x: x.date,
+    'alias': lambda x: x.alias,
+    'default': lambda x: [x.notebook, x.alias],
+}
 _DEBUG = False
 _CACHED_ATTR = '_cache'
 _PASS_CACHE_KWARG = 'not_cached'
-__VERSION__ = '1.0.0'
+__VERSION__ = '1.1.0'
 
 _PATH = os.path.expanduser('~/.noteit/')
 _TOKEN_PATH = os.path.join(_PATH, 'noteit.v2.tkn')
@@ -88,8 +95,8 @@ _REPORT_TOKEN = 'woLCrMKhw5nCvcK8wrDCoX_Cj8KFwqDCsHbCjsOMwo_CsnlswrB9wrHCm8KPwqj
 _TYPES = _TEXT_TYPE, _FILE_TYPE, _ENCRYPT_TYPE = ['text', 'file', 'entext']
 
 _DECRYPT_ERROR_MSG = u"Error - can't decrypt note"
-_TEMPLATE = u' {alias:^35} {updated:^20} {public:^6}'
-_TEMPLATE_N = u' {notebook:^12} ' + _TEMPLATE
+_TEMPLATE = u' {n.alias:^35} {n.date:^20} {n.public:^6}'
+_TEMPLATE_N = u' {n.notebook:^12} ' + _TEMPLATE
 _TRUE = u'\u2713'
 _YES = [u'yes', u'y', u'poehali']
 _FORMAT = _DATE_FORMAT = '%d-%m-%y %H:%M'
@@ -151,13 +158,8 @@ def cached_function(func):
 
 def get_notes(all=False, notebook=None, public=False, user=''):
     """Return user's notes as string"""
-    template = _TEMPLATE
-    if all:
-        template = _TEMPLATE_N
 
     objects = get_gist_manager()
-    yield template.replace(u'<', u'^').format(alias='ALIAS', notebook='NOTEBOOK',
-                                              updated='UPDATED', public='PUBLIC')
 
     for gist in objects.noteit_gists(user):
         meta = gist.description.split('.')[2 if user else 1:]
@@ -173,10 +175,7 @@ def get_notes(all=False, notebook=None, public=False, user=''):
                 continue
         for _file in gist.files:
             alias, _, updated = _parse_file_name(_file.name)
-            yield template.format(notebook=_notebook or '__main__',
-                                  alias=alias,
-                                  public=_TRUE if gist.public else '',
-                                  updated=updated.strftime(_FORMAT) if updated else 'unknown')
+            yield Note(alias, _notebook or '__main__', updated, _TRUE if gist.public else '')
 
 
 def get_note(alias, notebook=None, public=False, user=''):
@@ -548,7 +547,7 @@ def _get_default_headers():
     """Return dict of headers for request"""
     return {
         _ACCEPT_HEADER: _APPLICATION_JSON,
-        _USER_AGENT_HEADER: _generate_user_agent_with_info(),
+        _USER_AGENT_HEADER: _get_user_agent(),
         _CONTENT_TYPE_HEADER: _APPLICATION_JSON,
     }
 
@@ -708,34 +707,32 @@ def get_options_parser():
     """Arguments definition"""
     parser = argparse.ArgumentParser(description='Tool for creating notes in your gists', prog='noteit')
 
-    parser.add_argument('--version', action='version', version='%(prog)s ' + get_version(),
-                        help='displays the current version of %(prog)s and exit')
-    parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
-
-    parser.add_argument('note', metavar='NOTE', nargs='*', default=_get_from_pipe(),
-                        help='new note')
+    parser.add_argument('note', metavar='NOTE', nargs='*', default=_get_from_pipe(), help='new note')
 
     parser.add_argument('-u', '--user', help='username')
     parser.add_argument('--password', help='password')
     parser.add_argument('-t', '--token', help='token')
-    parser.add_argument('--anon', help='for users without accounts',
-                        action='store_true')
+    parser.add_argument('--anon', help='for users without accounts', action='store_true')
+
+    parser.add_argument('-n', '--notebook', help='set notebook for note / display notes with given notebook')
+    parser.add_argument('-k', '--key', help='key to encrypting/decrypting notes', action='store_true')
 
     parser.add_argument('-p', '--public', help='Public notes', action='store_true')
-
+    parser.add_argument('-s', '--sort', help='Sort type for notes',
+                        choices=list(SORTING.keys()) + ['n' + k for k in SORTING.keys()] + ['-'], default='default')
     parser.add_argument('--all', help='display all notes', action='store_true')
+
     parser.add_argument('-l', '--last', help='display last note', action='store_true')
     parser.add_argument('-a', '--alias', help='set alias for note / display note with given alias')
-    parser.add_argument('-n', '--notebook', help='set notebook for note / display notes with given notebook')
-
     parser.add_argument('-d', '--delete', help='delete note/notebook', action='store_true')
 
-    parser.add_argument('--do-not-save', help='disable savings any data locally',
-                        action='store_true')
-    parser.add_argument('-k', '--key', help='key to encrypting/decrypting notes',
-                        action='store_true')
+    parser.add_argument('--do-not-save', help='disable savings any data locally', action='store_true')
 
     parser.add_argument('-r', '--report', help=argparse.SUPPRESS, action='store_true')
+    parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
+
+    parser.add_argument('--version', action='version', version='%(prog)s ' + get_version(),
+                        help='displays the current version of %(prog)s and exit')
 
     return parser
 
@@ -790,8 +787,17 @@ def main(retry=True):
                 delete_notebook(options.notebook, options.public, user)
                 print('Notebook "{0}" deleted'.format(notebook))
         else:
-            for out in get_notes(all=options.all, notebook=notebook, public=options.public, user=user):
-                print(out)
+            template = _TEMPLATE
+            if options.all:
+                template = _TEMPLATE_N
+            print(template.replace(u'<', u'^').format(n=Note('ALIAS', 'NOTEBOOK', 'UPDATED', 'PUBLIC')))
+            notes = get_notes(all=options.all, notebook=notebook, public=options.public, user=user)
+            key, reverse = '-default' if options.sort == '-' else options.sort, False
+            if key.startswith('n'):
+                key, reverse = key[1:], True
+            for note in sorted(notes, key=SORTING[key], reverse=reverse):
+                note = Note(note.alias, note.notebook, note.date.strftime(_FORMAT), note.public)
+                print(template.format(n=note))
 
     except KeyboardInterrupt:
         sys.exit('\n')
